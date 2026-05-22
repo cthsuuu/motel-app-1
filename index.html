@@ -1,0 +1,3211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HMOTEL佳緹一館房務系統</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- Storage not required: photos stored as base64 in Realtime Database -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0f0f0f;--bg2:#1a1a1a;--bg3:#252525;--bg4:#2e2e2e;
+  --text:#e0e0e0;--text2:#a0a0a0;--text3:#666;
+  --primary:#4f8ef7;--primary-d:#3a6fd8;
+  --success:#4caf50;--warning:#ff9800;--danger:#f44336;--info:#29b6f6;
+  --border:#333;--border2:#444;
+  --radius:10px;--radius-sm:6px;
+  --nav-h:60px;--hdr-h:54px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;overflow:hidden;}
+
+/* ── UTILS ── */
+.hidden{display:none!important;}
+.flex{display:flex;}.flex-col{flex-direction:column;}.items-center{align-items:center;}.justify-between{justify-content:space-between;}.gap-2{gap:8px;}.gap-3{gap:12px;}
+.p-3{padding:12px;}.p-4{padding:16px;}
+.mt-2{margin-top:8px;}.mt-3{margin-top:12px;}.mt-4{margin-top:16px;}
+.w-full{width:100%;}
+.text-center{text-align:center;}
+.text-sm{font-size:13px;}.text-xs{font-size:11px;}.text-lg{font-size:18px;}.text-xl{font-size:22px;}
+.font-bold{font-weight:700;}.font-semibold{font-weight:600;}
+.rounded{border-radius:var(--radius);}.rounded-sm{border-radius:var(--radius-sm);}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+.btn:active{opacity:.75;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-success{background:var(--success);color:#fff;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-warning{background:var(--warning);color:#fff;}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border2);}
+.btn-sm{padding:6px 12px;font-size:13px;}
+.btn-lg{padding:14px 24px;font-size:16px;width:100%;}
+.btn-icon{padding:8px;border-radius:50%;background:var(--bg3);}
+
+/* ── INPUTS ── */
+input,select,textarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:10px 12px;font-size:14px;width:100%;outline:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);}
+select option{background:var(--bg3);}
+label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
+
+/* ── CARDS ── */
+.card{background:var(--bg2);border-radius:var(--radius);padding:14px;}
+.card-sm{background:var(--bg3);border-radius:var(--radius-sm);padding:10px;}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-normal{background:#1a3a6a;color:#4f8ef7;}
+.badge-deep{background:#3a1a6a;color:#9c7af7;}
+.badge-rush{background:#6a1a1a;color:#f77a4f;}
+.badge-stair{background:#1a5a3a;color:#4ff78e;}
+.badge-garage{background:#5a4a1a;color:#f7c24f;}
+
+/* ── SCROLLABLE CONTAINER ── */
+.scroll-view{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
+/* ── LOGIN PAGE ── */
+#loginPage{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;overflow-y:auto;}
+.login-header{background:var(--bg2);padding:20px 16px 16px;text-align:center;border-bottom:1px solid var(--border);}
+.login-logo{font-size:32px;margin-bottom:8px;}
+.login-title{font-size:20px;font-weight:700;color:var(--primary);}
+.login-subtitle{font-size:13px;color:var(--text2);margin-top:4px;}
+.staff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px;}
+.staff-item{background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius);padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;}
+.staff-item.selected{border-color:var(--primary);background:#1a2a4a;}
+.staff-item .staff-avatar{width:44px;height:44px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:20px;}
+.staff-item .staff-name{font-size:13px;font-weight:600;}
+.staff-item .staff-role{font-size:11px;color:var(--text2);margin-top:2px;}
+.login-actions{padding:16px;display:flex;flex-direction:column;gap:10px;}
+
+/* ── APP LAYOUT ── */
+#mainApp{position:fixed;inset:0;display:flex;flex-direction:column;}
+#appHeader{height:var(--hdr-h);background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0;}
+#headerLeft{font-size:16px;font-weight:700;color:var(--primary);}
+#headerRight{display:flex;align-items:center;gap:8px;}
+#syncTime{font-size:11px;color:var(--text3);}
+.hdr-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:20px;font-size:12px;cursor:pointer;}
+#staffNames{font-size:12px;color:var(--text2);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── TAB CONTENT ── */
+#tabContent{flex:1;overflow:hidden;position:relative;}
+.tab-page{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;flex-direction:column;}
+.tab-page.active{display:flex;}
+
+/* ── BOTTOM NAV ── */
+#bottomNav{height:var(--nav-h);background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:stretch;flex-shrink:0;}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:none;background:transparent;color:var(--text2);font-size:10px;transition:color .15s;}
+.nav-item.active{color:var(--primary);}
+.nav-item .nav-icon{font-size:20px;}
+
+/* ── FLOOR FILTER ── */
+.floor-filter{display:flex;gap:6px;padding:12px 14px 0;overflow-x:auto;flex-shrink:0;}
+.floor-btn{padding:6px 16px;border-radius:20px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.floor-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+
+/* ── ROOM GRID ── */
+.room-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 14px 14px;}
+.room-card{background:var(--bg2);border-radius:var(--radius-sm);padding:10px 8px 10px 12px;cursor:pointer;position:relative;overflow:hidden;border-left:4px solid var(--text3);min-height:80px;}
+.room-card.status-pending{border-left-color:#666;}
+.room-card.status-cleaning{border-left-color:var(--success);}
+.room-card.status-completed{border-left-color:var(--primary);}
+.room-card.status-problem{border-left-color:#666;}
+.room-card .room-no{font-size:17px;font-weight:700;}
+.room-card .room-type{font-size:10px;margin-top:2px;}
+.room-card .room-staff{font-size:11px;color:var(--text2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.room-card .room-time{font-size:10px;color:var(--text3);margin-top:2px;}
+.room-card .problem-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--danger);}
+
+/* ── SECTION HEADER ── */
+.section-hdr{padding:14px 14px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.section-title{font-size:16px;font-weight:700;}
+
+/* ── RECORDS ── */
+.record-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin:0 14px 10px;}
+.record-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.record-room{font-size:18px;font-weight:700;}
+.record-times{font-size:12px;color:var(--text2);margin-top:4px;}
+.record-areas{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+.area-tag{background:var(--bg3);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);}
+.photo-row{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:4px;}
+.photo-thumb{width:72px;height:72px;border-radius:var(--radius-sm);object-fit:cover;flex-shrink:0;cursor:pointer;}
+.photo-add{width:72px;height:72px;border-radius:var(--radius-sm);background:var(--bg3);border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--text3);cursor:pointer;flex-shrink:0;}
+
+/* ── ISSUES ── */
+.issue-filter-bar{display:flex;gap:6px;padding:12px 14px 0;flex-shrink:0;}
+.issue-filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer;}
+.issue-filter-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+.issue-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin:0 14px 10px;}
+.issue-top{display:flex;align-items:flex-start;justify-content:space-between;}
+.issue-room{font-size:16px;font-weight:700;}
+.severity-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.sev-low{background:#1a4a1a;color:#4caf50;}
+.sev-mid{background:#4a3a1a;color:#ff9800;}
+.sev-high{background:#4a1a1a;color:#f44336;}
+.issue-desc{font-size:14px;margin-top:6px;color:var(--text);}
+.issue-meta{font-size:12px;color:var(--text2);margin-top:4px;}
+.issue-actions{display:flex;justify-content:flex-end;margin-top:10px;}
+
+/* ── INSPECTION ── */
+.inspect-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin:0 14px 10px;}
+.checklist-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.checklist-item:last-child{border-bottom:none;}
+.custom-check{width:22px;height:22px;border-radius:5px;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.custom-check.checked{background:var(--success);border-color:var(--success);}
+.check-label{font-size:14px;}
+.progress-bar-wrap{height:6px;background:var(--bg3);border-radius:3px;margin:8px 0;}
+.progress-bar{height:100%;background:var(--success);border-radius:3px;transition:width .3s;}
+
+/* ── MANAGEMENT ── */
+.mgmt-tabs{display:flex;padding:12px 14px 0;gap:8px;flex-shrink:0;}
+.mgmt-tab{padding:7px 16px;border-radius:20px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer;}
+.mgmt-tab.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+.staff-list-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin:0 14px 10px;}
+.staff-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);}
+.staff-row:last-child{border-bottom:none;}
+.report-row{display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);}
+.report-row:last-child{border-bottom:none;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+.modal-overlay.center{align-items:center;}
+.modal-box{background:var(--bg2);border-radius:16px 16px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 16px;animation:slideUp .25s ease;}
+.modal-overlay.center .modal-box{border-radius:16px;max-width:420px;margin:16px;animation:fadeIn .2s;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{font-size:22px;cursor:pointer;color:var(--text2);line-height:1;}
+.form-group{margin-bottom:14px;}
+.area-assign-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.area-block{background:var(--bg3);border-radius:var(--radius-sm);padding:10px;}
+.area-block-title{font-size:12px;font-weight:600;color:var(--primary);margin-bottom:8px;}
+.assign-person{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.assign-person select{flex:1;}
+.divider{height:1px;background:var(--border);margin:12px 0;}
+
+/* ── PHOTO LIGHTBOX ── */
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:flex;align-items:center;justify-content:center;}
+#lightbox img{max-width:95vw;max-height:90vh;border-radius:8px;}
+#lightbox .close-lb{position:absolute;top:16px;right:16px;font-size:32px;color:#fff;cursor:pointer;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--text);padding:10px 20px;border-radius:20px;font-size:14px;z-index:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text2);}
+.empty-state .empty-icon{font-size:48px;margin-bottom:12px;}
+
+/* ── SPINNER ── */
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+/* ── INSPECTION ITEMS ── */
+.insp-cat-title{font-size:13px;font-weight:700;color:var(--primary);padding:7px 0 5px;border-bottom:2px solid var(--primary);margin-bottom:6px;}
+.insp-item{padding:8px 0;border-bottom:1px solid var(--border);}
+.insp-item:last-child{border-bottom:none;}
+.insp-item-row{display:flex;align-items:center;gap:6px;}
+.insp-item-name{flex:1;font-size:13px;}
+.insp-item-qty{font-size:11px;color:var(--text3);}
+.insp-btns{display:flex;gap:4px;flex-shrink:0;}
+.insp-btn{padding:5px 8px;border-radius:5px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;white-space:nowrap;}
+.insp-btn.insp-ok{background:var(--success);border-color:var(--success);color:#fff;}
+.insp-btn.insp-defect{background:var(--danger);border-color:var(--danger);color:#fff;}
+.insp-btn.insp-na{background:var(--bg4);border-color:var(--border2);color:var(--text3);}
+.insp-reason{width:100%;margin-top:5px;font-size:12px;padding:6px 8px;}
+/* ── OVERVIEW ROOM CARD ── */
+.ov-room{background:var(--bg2);border-radius:var(--radius-sm);padding:8px 6px 8px 10px;cursor:pointer;border-left:4px solid #555;min-height:64px;}
+.ov-room.ov-ok{border-left-color:var(--primary);}
+.ov-room.ov-inspected{border-left-color:var(--primary);}
+.ov-room .ov-no{font-size:15px;font-weight:700;}
+.ov-room .ov-date{font-size:10px;color:var(--text2);margin-top:2px;}
+.ov-room .ov-status{font-size:10px;margin-top:2px;}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN PAGE ══════════ -->
+<div id="loginPage">
+  <div class="login-header">
+    <div class="login-logo">🏨</div>
+    <div class="login-title" id="lbl-appTitle">HMOTEL佳緹一館房務系統</div>
+    <div class="login-subtitle" id="lbl-selectStaff">請選擇今天上班人員</div>
+  </div>
+  <div id="staffGrid" class="staff-grid"></div>
+  <div class="login-actions">
+    <button class="btn btn-primary btn-lg" id="btnEnter" onclick="enterSystem()">
+      <span id="lbl-enter">進入整房系統</span>
+    </button>
+    <button class="btn btn-outline btn-lg" onclick="enterAdmin()">
+      <span id="lbl-adminEnter">🔧 管理員進入</span>
+    </button>
+    <button class="btn btn-outline btn-sm" style="width:auto;align-self:center;" onclick="toggleLang()">
+      <span id="lbl-langSwitch">切換越南文 / Chuyển tiếng Việt</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ MAIN APP ══════════ -->
+<div id="mainApp" class="hidden">
+  <!-- Header -->
+  <div id="appHeader">
+    <div id="headerLeft" style="font-size:13px;font-weight:700;">HMOTEL佳緹一館房務系統</div>
+    <div id="headerRight">
+      <span id="syncTime"></span>
+      <span id="staffNames"></span>
+      <button class="hdr-btn" onclick="toggleLang()" id="langBtn">VI</button>
+      <button class="hdr-btn" onclick="showShiftModal()" id="lbl-shift">換班</button>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div id="tabContent">
+    <!-- ── Tab 1: Overview ── -->
+    <div id="tab-overview" class="tab-page active">
+      <div class="floor-filter" id="floorFilter" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <button class="floor-btn active" data-floor="all" onclick="setFloor('all')" id="lbl-all">全部</button>
+        <button class="floor-btn" data-floor="1區" onclick="setFloor('1區')">1區(1F)</button>
+        <button class="floor-btn" data-floor="2區" onclick="setFloor('2區')">2區(1F)</button>
+        <button class="floor-btn" data-floor="3區" onclick="setFloor('3區')">3區(1F)</button>
+        <button class="floor-btn" data-floor="5F"  onclick="setFloor('5F')">5F商務</button>
+        <button class="btn btn-sm btn-outline" style="margin-left:auto;font-size:12px;padding:4px 10px;" onclick="refreshOverview()">🔄 更新今日</button>
+      </div>
+      <div id="ovDateLabel" style="font-size:11px;color:var(--text2);padding:2px 14px 6px;"></div>
+      <div id="roomGrid" class="room-grid"></div>
+    </div>
+
+    <!-- ── Tab 2: Records ── -->
+    <div id="tab-records" class="tab-page">
+      <div class="section-hdr">
+        <div class="section-title" id="recPageTitle">📋 紀錄</div>
+        <button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="loadRecordsByDate()">🔄 重新整理</button>
+      </div>
+      <!-- 業務日選擇 -->
+      <div style="padding:0 14px 10px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;">
+          <span style="font-size:13px;color:var(--text2);white-space:nowrap;">📅 業務日</span>
+          <input type="date" id="recDatePicker" style="flex:1;border:none;background:transparent;color:var(--text);font-size:14px;font-weight:600;outline:none;" onchange="loadRecordsByDate()">
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;" onclick="setRecDate('prev')">‹</button>
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;" onclick="setRecDate('next')">›</button>
+          <button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="setRecDate('today')">今日</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;padding:0 14px 8px;flex-shrink:0;">
+        <button class="floor-btn active" data-rec="all"   onclick="setRecFilter('all')">全部</button>
+        <button class="floor-btn" data-rec="clean" onclick="setRecFilter('clean')">🧹 整房</button>
+        <button class="floor-btn" data-rec="insp"  onclick="setRecFilter('insp')">🔍 查房</button>
+      </div>
+      <div id="recordsList"></div>
+    </div>
+
+    <!-- ── Tab 3: Issues ── -->
+    <div id="tab-issues" class="tab-page">
+      <div class="section-hdr">
+        <div class="section-title" id="lbl-issueTitle">⚠️ 問題回報</div>
+        <button class="btn btn-sm btn-danger" onclick="openIssueModal(null)" id="lbl-report">＋ 回報</button>
+      </div>
+      <div class="issue-filter-bar">
+        <button class="issue-filter-btn active" data-filter="all" onclick="setIssueFilter('all')" id="lbl-all2">全部</button>
+        <button class="issue-filter-btn" data-filter="pending" onclick="setIssueFilter('pending')" id="lbl-pending">待處理</button>
+        <button class="issue-filter-btn" data-filter="resolved" onclick="setIssueFilter('resolved')" id="lbl-resolved">已解決</button>
+      </div>
+      <div id="issuesList" style="padding-top:10px;"></div>
+    </div>
+
+    <!-- ── Tab 4: Inspection ── -->
+    <div id="tab-inspection" class="tab-page">
+      <div class="section-hdr">
+        <div class="section-title">🔍 查房功能</div>
+        <button class="btn btn-sm btn-success" onclick="exportInspectionExcel()">📊 匯出Excel</button>
+      </div>
+      <!-- 10-day overview -->
+      <div style="padding:0 14px 4px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px;">📋 10天查房總覽</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;">
+          <button class="floor-btn active" data-ov="all"  onclick="setOvFloor('all')">全部</button>
+          <button class="floor-btn" data-ov="1區" onclick="setOvFloor('1區')">1區</button>
+          <button class="floor-btn" data-ov="2區" onclick="setOvFloor('2區')">2區</button>
+          <button class="floor-btn" data-ov="3區" onclick="setOvFloor('3區')">3區</button>
+          <button class="floor-btn" data-ov="5F"  onclick="setOvFloor('5F')">5F商務</button>
+        </div>
+        <div id="inspOverviewGrid" class="room-grid" style="padding:0;margin-bottom:12px;"></div>
+      </div>
+      <!-- Start inspection -->
+      <div style="padding:0 14px 14px;">
+        <div class="card">
+          <div class="form-group">
+            <label>選擇樓層</label>
+            <select id="inspFloor" onchange="renderInspectRooms()">
+              <option value="all">全部</option>
+              <option value="1區">1區 (1F車庫 101-111)</option>
+              <option value="2區">2區 (1F車庫 201-210)</option>
+              <option value="3區">3區 (1F車庫 301-309)</option>
+              <option value="5F">5F 商務房/會議室</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>選擇房間</label>
+            <select id="inspRoom"></select>
+          </div>
+          <button class="btn btn-primary w-full mt-2" onclick="startInspection()">🔍 開始查房</button>
+        </div>
+        <button class="btn btn-outline w-full mt-2" onclick="openInspPeriodModal()" style="margin-top:8px;">
+          📅 設定查房週期
+        </button>
+        <div id="periodInfoBanner" style="font-size:12px;color:var(--primary);margin-top:8px;text-align:center;"></div>
+        <div id="periodRecordsList" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Tab 5: Management ── -->
+    <div id="tab-reports" class="tab-page">
+      <div id="reportsContent" style="padding:14px;"></div>
+    </div>
+
+    <div id="tab-management" class="tab-page">
+      <div id="mgmtContent" style="padding:14px;"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav id="bottomNav">
+    <button class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
+      <span class="nav-icon">🏠</span><span id="nav-overview">總覽</span>
+    </button>
+    <button class="nav-item" data-tab="records" onclick="switchTab('records')">
+      <span class="nav-icon">📋</span><span id="nav-records">紀錄</span>
+    </button>
+    <button class="nav-item" data-tab="issues" onclick="switchTab('issues')">
+      <span class="nav-icon">⚠️</span><span id="nav-issues">問題</span>
+    </button>
+    <button class="nav-item" data-tab="inspection" onclick="switchTab('inspection')">
+      <span class="nav-icon">🔍</span><span id="nav-inspection">查房</span>
+    </button>
+    <button class="nav-item" data-tab="reports" onclick="switchTab('reports')">
+      <span class="nav-icon">📊</span><span id="nav-reports">報表</span>
+    </button>
+    <button class="nav-item" data-tab="management" onclick="switchTab('management')">
+      <span class="nav-icon">⚙️</span><span id="nav-management">管理</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Start Cleaning Modal -->
+<div id="modalStartCleaning" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalStartCleaning')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="lbl-startCleaning">開始整房</span>
+      <span class="modal-close" onclick="closeModal('modalStartCleaning')">✕</span>
+    </div>
+    <div class="form-group">
+      <label id="lbl-roomNo">房號</label>
+      <div id="scRoomNo" style="font-size:22px;font-weight:700;color:var(--primary);"></div>
+    </div>
+    <div class="form-group">
+      <label id="lbl-cleanType">整理類型</label>
+      <select id="scType">
+        <option value="normal">正常整</option>
+        <option value="deep">大保養</option>
+        <option value="rush">趕房</option>
+        <option value="stair">樓梯保養</option>
+        <option value="garage">車庫保養</option>
+      </select>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;" id="lbl-areaAssign">區域人員分配</div>
+    <div class="area-assign-grid" id="areaAssignGrid">
+      <!-- Dynamically generated -->
+    </div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-success btn-lg" onclick="confirmStartCleaning()" id="lbl-confirmStart">✅ 確認開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Detail Modal -->
+<div id="modalRoomDetail" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalRoomDetail')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="rdRoomNo"></span>
+      <span class="modal-close" onclick="closeModal('modalRoomDetail')">✕</span>
+    </div>
+    <div id="rdContent"></div>
+  </div>
+</div>
+
+<!-- Issue Report Modal -->
+<div id="modalIssue" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalIssue')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="lbl-reportIssue">⚠️ 回報問題</span>
+      <span class="modal-close" onclick="closeModal('modalIssue')">✕</span>
+    </div>
+    <div class="form-group">
+      <label id="lbl-room">房號</label>
+      <select id="issueRoom"></select>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label id="lbl-issueDesc" style="margin:0;">問題描述</label>
+        <button class="btn btn-sm btn-outline" onclick="translateIssueDesc()" style="font-size:11px;padding:3px 8px;">🔄 越→中</button>
+      </div>
+      <textarea id="issueDesc" rows="3" placeholder="請描述問題..."></textarea>
+    </div>
+    <div class="form-group">
+      <label id="lbl-severity">嚴重程度</label>
+      <select id="issueSeverity">
+        <option value="low">輕微</option>
+        <option value="mid">中等</option>
+        <option value="high">嚴重</option>
+      </select>
+    </div>
+    <button class="btn btn-danger btn-lg" onclick="submitIssue()" id="lbl-submitIssue">提交問題</button>
+  </div>
+</div>
+
+<!-- Inspection Modal -->
+<div id="modalInspection" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalInspection')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="inspModalTitle">查房</span>
+      <span class="modal-close" onclick="closeModal('modalInspection')">✕</span>
+    </div>
+    <div id="lastCleanInfo" class="card-sm" style="margin-bottom:12px;font-size:13px;color:var(--text2);"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="progress-bar-wrap" style="flex:1;margin:0;">
+        <div class="progress-bar" id="inspProgress" style="width:0%"></div>
+      </div>
+      <div id="inspProgressLabel" style="font-size:12px;color:var(--text2);white-space:nowrap;min-width:40px;text-align:right;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
+      每項請選擇：<span style="color:var(--success);">✓ OK</span> ／ <span style="color:var(--danger);">⚠ 缺失</span>（需填原因）／ <span style="color:var(--text3);">N/A</span>（無此設備）
+    </div>
+    <div id="checklistItems"></div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-success btn-lg" onclick="completeInspection()">✅ 完成查房</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inspection Period Modal -->
+<div id="modalInspPeriod" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalInspPeriod')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>📅 設定查房週期</span>
+      <span class="modal-close" onclick="closeModal('modalInspPeriod')">✕</span>
+    </div>
+    <div class="form-group">
+      <label>開始日期</label>
+      <input type="date" id="inspPeriodStart">
+    </div>
+    <div class="form-group">
+      <label>結束日期</label>
+      <input type="date" id="inspPeriodEnd">
+    </div>
+    <div class="form-group">
+      <label>週期說明（選填）</label>
+      <input type="text" id="inspPeriodLabel" placeholder="例：4月第一週查房">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-primary btn-lg" onclick="saveInspPeriod()">✅ 設定週期</button>
+      <button class="btn btn-warning btn-lg" onclick="resetInspPeriod()">🔄 重置查房畫面</button>
+    </div>
+    <div id="currentPeriodInfo" style="font-size:12px;color:var(--text2);margin-top:12px;text-align:center;"></div>
+  </div>
+</div>
+
+<!-- Shift Modal -->
+<div id="modalShift" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalShift')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="lbl-changeShift">換班 / 重新選人</span>
+      <span class="modal-close" onclick="closeModal('modalShift')">✕</span>
+    </div>
+    <div id="shiftStaffGrid" class="staff-grid" style="padding:0;"></div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary btn-lg" onclick="confirmShift()" id="lbl-confirmShift">確認換班</button>
+      <button class="btn btn-outline btn-lg" onclick="goToLogin()">回到登入頁</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Password Modal -->
+<div id="modalAdminPwd" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalAdminPwd')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>🔐 管理員登入</span>
+      <span class="modal-close" onclick="closeModal('modalAdminPwd')">✕</span>
+    </div>
+    <div class="form-group">
+      <label>管理員密碼</label>
+      <input type="password" id="adminPwdInput" placeholder="請輸入密碼"
+        onkeydown="if(event.key==='Enter')checkAdminPassword()">
+    </div>
+    <button class="btn btn-primary btn-lg" onclick="checkAdminPassword()">🔓 確認登入</button>
+  </div>
+</div>
+
+<!-- Add Staff Modal -->
+<div id="modalAddStaff" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalAddStaff')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="lbl-addStaff">新增人員</span>
+      <span class="modal-close" onclick="closeModal('modalAddStaff')">✕</span>
+    </div>
+    <div class="form-group">
+      <label id="lbl-name">姓名</label>
+      <input type="text" id="newStaffName" placeholder="輸入姓名">
+    </div>
+    <div class="form-group">
+      <label id="lbl-role">職位</label>
+      <select id="newStaffRole">
+        <option value="cleaner">房務員</option>
+        <option value="supervisor">主管</option>
+        <option value="maintenance">工務</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label id="lbl-phone">電話</label>
+      <input type="tel" id="newStaffPhone" placeholder="電話號碼">
+    </div>
+    <button class="btn btn-primary btn-lg" onclick="submitAddStaff()" id="lbl-saveStaff">儲存</button>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="modalChangePwd" class="modal-overlay center hidden" onclick="closeModalOverlay(event,'modalChangePwd')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>🔑 修改管理員密碼</span>
+      <span class="modal-close" onclick="closeModal('modalChangePwd')">✕</span>
+    </div>
+    <div class="form-group">
+      <label>舊密碼</label>
+      <input type="password" id="oldPwdInput" placeholder="舊密碼">
+    </div>
+    <div class="form-group">
+      <label>新密碼</label>
+      <input type="password" id="newPwdInput" placeholder="新密碼">
+    </div>
+    <div class="form-group">
+      <label>確認新密碼</label>
+      <input type="password" id="confirmPwdInput" placeholder="再輸入一次">
+    </div>
+    <button class="btn btn-primary btn-lg" onclick="changeAdminPassword()">💾 儲存新密碼</button>
+  </div>
+</div>
+
+<!-- ── Modal: 修改整房紀錄（管理員專用）── -->
+<div id="modalEditRecord" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalEditRecord')">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto;">
+    <div class="modal-title">
+      <span>✏️ 修改整房紀錄</span>
+      <span class="modal-close" onclick="closeModal('modalEditRecord')">✕</span>
+    </div>
+    <div id="editRecordContent"></div>
+  </div>
+</div>
+
+<!-- Photo Lightbox -->
+<div id="lightbox" class="hidden">
+  <span class="close-lb" onclick="closeLightbox()">✕</span>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- File Input (hidden) -->
+<input type="file" id="photoInput" accept="image/*" multiple style="display:none;" onchange="handlePhotoUpload(event)">
+<script>
+// ════════════════════════════════
+//  FIREBASE CONFIG
+// ════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAMPFPOyyUHUG9H93MfywePn7OAUqiTON4",
+  authDomain: "motel-housekeeping.firebaseapp.com",
+  databaseURL: "https://motel-housekeeping-default-rtdb.firebaseio.com",
+  projectId: "motel-housekeeping",
+  storageBucket: "motel-housekeeping.appspot.com",
+  messagingSenderId: "1077545679137",
+  appId: "1:1077545679137:web:91fb871bd11f9b14e7e660"
+};
+
+// ════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════
+const ROOMS = {
+  '1區': ['101','102','103','105','106','107','108','109','110','111'],
+  '2區': ['201','202','203','205','206','207','208','209','210'],
+  '3區': ['301','302','303','305','306','307','308','309'],
+  '5F':  ['501','502','503','505','506','507']
+};
+// 說明: 1區/2區/3區 均為1F車庫房，5F為商務房/會議室
+const ALL_ROOMS = [...ROOMS['1區'], ...ROOMS['2區'], ...ROOMS['3區'], ...ROOMS['5F']];
+
+const CLEANING_TYPES = {
+  normal: {zh:'正常整', vi:'Dọn thường', cls:'badge-normal'},
+  deep:   {zh:'大保養', vi:'Bảo dưỡng lớn', cls:'badge-deep'},
+  rush:   {zh:'趕房',   vi:'Phòng gấp', cls:'badge-rush'},
+  stair:  {zh:'樓梯保養', vi:'Bảo dưỡng cầu thang', cls:'badge-stair'},
+  garage: {zh:'車庫保養', vi:'Bảo dưỡng nhà xe', cls:'badge-garage'}
+};
+
+const AREAS = {
+  room:     {zh:'房間',     vi:'Phòng'},
+  middle:   {zh:'中間',     vi:'Khu giữa'},
+  bathroom: {zh:'廁所',     vi:'Phòng tắm'},
+  stair:    {zh:'樓梯', vi:'Cầu thang'},
+  garage:   {zh:'車庫', vi:'Nhà xe'}
+};
+
+const INSPECTION_CATEGORIES = [
+  { cat:'general', label:'一般', items:[
+    {id:'anti_peep', name:'反針孔檢查'},
+    {id:'ac',        name:'冷氣控制(24度/自動)'},
+  ]},
+  { cat:'dresser', label:'梳妝台區', items:[
+    {id:'dresser_mirror', name:'梳妝台鏡面/桌面'},
+    {id:'maint_sign',     name:'維護牌/紅酒牌/禁菸牌【A5】', qty:'1'},
+    {id:'shelf',          name:'層架(價目/須知/搖說/菜單)',   qty:'4'},
+    {id:'remote',         name:'遙控器',                      qty:'1'},
+    {id:'condom',         name:'保險套/潤滑液',                qty:'2/1'},
+    {id:'namecard',       name:'名片/筆'},
+    {id:'mic_box',        name:'麥克風盒/麥克風',              qty:'1/2'},
+    {id:'mic_cover',      name:'麥克風套1包+電池*4顆',         qty:'1/4'},
+    {id:'snacks',         name:'泡麵/筷子/餅乾',              qty:'各2'},
+    {id:'amenity_tray',   name:'黑色備品盤',                  qty:'1'},
+    {id:'kettle',         name:'熱水壺/防燙三角',              qty:'1/1'},
+    {id:'water',          name:'水/馬克杯/杯墊',              qty:'2/2/2'},
+    {id:'drinks',         name:'沖泡飲品/茶包/調棒',           qty:'2/2/2'},
+    {id:'fridge_drinks',  name:'冰箱飲品',                    qty:'2'},
+    {id:'fridge',         name:'冰箱',                        qty:'1'},
+    {id:'trash_room',     name:'垃圾桶',                      qty:'1'},
+  ]},
+  { cat:'equipment', label:'設備', items:[
+    {id:'vod_wifi',   name:'VOD/WIFI'},
+    {id:'tv',         name:'電視及整線'},
+    {id:'ktv',        name:'KTV設備測試'},
+    {id:'dehumid',    name:'吊隱式除濕機/落地除濕機'},
+    {id:'mosquito',   name:'電蚊香/防蚊液'},
+  ]},
+  { cat:'sofa', label:'沙發茶几', items:[
+    {id:'window',     name:'窗戶擦拭'},
+    {id:'sofa',       name:'沙發/沙發抱枕'},
+    {id:'tea_table',  name:'茶几'},
+    {id:'no_smoke',   name:'禁菸小三角牌',  qty:'1'},
+    {id:'stool',      name:'小圓凳'},
+  ]},
+  { cat:'bed', label:'床區', items:[
+    {id:'bedside',    name:'床頭櫃擦拭'},
+    {id:'tissue_box', name:'衛生紙盒(咖啡色)', qty:'1'},
+    {id:'eco_sign',   name:'環保立牌',          qty:'1'},
+    {id:'phone',      name:'電話測試/電話卡',   qty:'1'},
+    {id:'hanger',     name:'落地衣架',          qty:'1'},
+    {id:'pillow',     name:'大小枕頭/枕頭套',   qty:'2'},
+    {id:'bedding',    name:'床單/棉被/被套/圓柱枕', qty:'1'},
+    {id:'under_bed',  name:'床底下'},
+  ]},
+  { cat:'wall', label:'牆面/地板', items:[
+    {id:'headboard',  name:'床頭背牆/各式鏡面'},
+    {id:'bath_wall',  name:'廁所牆面/廁所玻璃門'},
+    {id:'switches',   name:'各式開關/檢查燈飾'},
+    {id:'room_floor', name:'房間地板'},
+  ]},
+  { cat:'shower', label:'淋浴間', items:[
+    {id:'shampoo',      name:'洗髮精/沐浴乳'},
+    {id:'shower_head',  name:'淋浴柱/蓮蓬頭'},
+    {id:'shower_wall',  name:'淋浴間牆面、地面(矽利康)'},
+    {id:'corner_pad',   name:'牆角防撞貼'},
+    {id:'shower_door',  name:'淋浴間玻璃門'},
+  ]},
+  { cat:'toilet', label:'廁所', items:[
+    {id:'toilet',       name:'馬桶/馬桶封條',        qty:'1'},
+    {id:'trash_toilet', name:'垃圾桶'},
+    {id:'bath_mirror',  name:'浴室鏡子/洗手台檯面'},
+    {id:'sink',         name:'面盆/面盆龍頭'},
+    {id:'hairdryer',    name:'吹風機/吹風機架'},
+    {id:'paper_cup',    name:'紙杯/杯墊/洗手露'},
+    {id:'towel',        name:'大毛/小毛/踏布'},
+    {id:'toilet_paper', name:'衛生紙(黑色)/捲紙'},
+    {id:'slippers',     name:'浴室拖鞋',             qty:'2'},
+    {id:'bathtub',      name:'浴缸/浴缸出水/冷熱貼'},
+    {id:'bath_tablet',  name:'泡湯塊',               qty:'1'},
+    {id:'toilet_floor', name:'廁所乾區地板/天花板/側牆'},
+  ]},
+  { cat:'stair_garage', label:'樓梯/車庫', items:[
+    {id:'room_door',    name:'房間門/逃生須知/房號牌'},
+    {id:'stair_wall',   name:'樓梯牆面/燈光'},
+    {id:'stair_fire',   name:'樓梯/減火器'},
+    {id:'slippers_stair', name:'皮拖鞋',             qty:'2'},
+    {id:'shoe_chair',   name:'穿鞋椅',               qty:'1'},
+    {id:'garage_table', name:'車庫取餐檯'},
+    {id:'garage_floor', name:'車庫地板/減火器'},
+    {id:'garage_wall',  name:'車庫天花板/牆面'},
+  ]},
+];
+// Keep legacy for any old references
+const INSPECTION_ITEMS = INSPECTION_CATEGORIES.flatMap(c => c.items.map(i => ({...i, zh:i.name, vi:i.name})));
+
+const DEFAULT_STAFF = [
+  {name:'小美', role:'cleaner'},
+  {name:'Lan', role:'cleaner'},
+  {name:'Huong', role:'cleaner'},
+  {name:'阿明', role:'maintenance'},
+  {name:'經理', role:'supervisor'}
+];
+
+const ROLE_LABELS = {
+  cleaner: {zh:'房務員', vi:'Nhân viên dọn phòng'},
+  supervisor: {zh:'主管', vi:'Quản lý'},
+  maintenance: {zh:'工務', vi:'Kỹ thuật'}
+};
+
+const REPORT_EMAIL = 'hmotel.jt@gmail.com';
+
+// ════════════════════════════════
+//  TRANSLATIONS
+// ════════════════════════════════
+const T = {
+  zh: {
+    appTitle:'HMOTEL佳緹一館房務系統', selectStaff:'請選擇今天上班人員',
+    enter:'進入整房系統', adminEnter:'🔧 管理員進入',
+    langSwitch:'切換越南文', shift:'換班',
+    all:'全部', pending:'待處理', resolved:'已解決',
+    todayRecords:'📋 當日整房紀錄', issueTitle:'⚠️ 問題回報',
+    report:'＋ 回報', inspectTitle:'🔍 查房功能',
+    startCleaning:'開始整房', roomNo:'房號', cleanType:'整理類型',
+    areaAssign:'區域人員分配', confirmStart:'✅ 確認開始',
+    reportIssue:'⚠️ 回報問題', room:'房號', issueDesc:'問題描述',
+    severity:'嚴重程度', submitIssue:'提交問題',
+    selectFloor:'選擇樓層', selectRoom:'選擇房間', startInspect:'開始查房',
+    completeInspect:'✅ 完成查房', changeShift:'換班 / 重新選人',
+    confirmShift:'確認換班', addStaff:'新增人員', name:'姓名',
+    role:'職位', phone:'電話', saveStaff:'儲存',
+    mgmtReport:'📊 報表', mgmtStaff:'👥 人員管理',
+    navOverview:'總覽', navRecords:'紀錄', navIssues:'問題',
+    navInspection:'查房', navManagement:'管理',
+    cleaning:'整理中', completed:'已完成', problemFlag:'有問題',
+    startTime:'開始', endTime:'結束', duration:'用時',
+    resolveIssue:'標記已解決', low:'輕微', mid:'中等', high:'嚴重',
+    statusPending:'待整理', statusCleaning:'整理中',
+    statusCompleted:'已完成', statusProblem:'有問題',
+    complete:'完成整房', noRecords:'今日尚無整房紀錄',
+    noIssues:'目前無問題記錄', addPhoto:'上傳照片',
+    generateReport:'產生報表', sendEmail:'寄送Email',
+    reportDate:'報表日期', staffCount:'人員統計',
+    inspCount:'查房數', cleanCount:'整房數',
+    selectStaffHint:'（請選擇人員）',
+    lastClean:'上次整理紀錄', inspHistory:'查房紀錄',
+    deleteConfirm:'確定要刪除此人員嗎？',
+    solving:'處理中', enterRoom:'進房時間',
+    unassigned:'未分配', mins:'分鐘',
+    supervisorOnly:'（主管/工務才能標記已解決）',
+    alreadyCleaning:'此房間已有整理中的紀錄',
+    noStaffSelected:'請至少選擇一位人員',
+    cleaningInProgress:'⏳ 整理中',
+    completeConfirm:'確定完成整房？'
+  },
+  vi: {
+    appTitle:'Hệ thống dọn phòng (Tòa 1)', selectStaff:'Chọn nhân viên trực hôm nay',
+    enter:'Vào hệ thống', adminEnter:'🔧 Vào với tư cách quản trị',
+    langSwitch:'Chuyển tiếng Trung', shift:'Đổi ca',
+    all:'Tất cả', pending:'Chờ xử lý', resolved:'Đã giải quyết',
+    todayRecords:'📋 Ghi chép dọn phòng hôm nay', issueTitle:'⚠️ Báo cáo sự cố',
+    report:'＋ Báo cáo', inspectTitle:'🔍 Kiểm tra phòng',
+    startCleaning:'Bắt đầu dọn', roomNo:'Số phòng', cleanType:'Loại dọn',
+    areaAssign:'Phân công khu vực', confirmStart:'✅ Xác nhận bắt đầu',
+    reportIssue:'⚠️ Báo cáo sự cố', room:'Số phòng', issueDesc:'Mô tả sự cố',
+    severity:'Mức độ nghiêm trọng', submitIssue:'Gửi sự cố',
+    selectFloor:'Chọn tầng', selectRoom:'Chọn phòng', startInspect:'Bắt đầu kiểm tra',
+    completeInspect:'✅ Hoàn thành kiểm tra', changeShift:'Đổi ca / Chọn lại',
+    confirmShift:'Xác nhận đổi ca', addStaff:'Thêm nhân viên', name:'Tên',
+    role:'Chức vụ', phone:'Điện thoại', saveStaff:'Lưu',
+    mgmtReport:'📊 Báo cáo', mgmtStaff:'👥 Quản lý nhân viên',
+    navOverview:'Tổng quan', navRecords:'Ghi chép', navIssues:'Sự cố',
+    navInspection:'Kiểm tra', navManagement:'Quản lý',
+    cleaning:'Đang dọn', completed:'Hoàn thành', problemFlag:'Có sự cố',
+    startTime:'Bắt đầu', endTime:'Kết thúc', duration:'Thời gian',
+    resolveIssue:'Đánh dấu đã giải quyết', low:'Nhẹ', mid:'Vừa', high:'Nặng',
+    statusPending:'Chờ dọn', statusCleaning:'Đang dọn',
+    statusCompleted:'Hoàn thành', statusProblem:'Có sự cố',
+    complete:'Hoàn thành dọn', noRecords:'Chưa có ghi chép hôm nay',
+    noIssues:'Không có sự cố nào', addPhoto:'Tải ảnh lên',
+    generateReport:'Tạo báo cáo', sendEmail:'Gửi Email',
+    reportDate:'Ngày báo cáo', staffCount:'Thống kê nhân viên',
+    inspCount:'Số lần kiểm tra', cleanCount:'Số phòng dọn',
+    selectStaffHint:'（Chọn nhân viên）',
+    lastClean:'Ghi chép dọn gần nhất', inspHistory:'Lịch sử kiểm tra',
+    deleteConfirm:'Bạn có chắc chắn muốn xóa nhân viên này không？',
+    solving:'Đang xử lý', enterRoom:'Giờ vào phòng',
+    unassigned:'Chưa phân công', mins:'phút',
+    supervisorOnly:'（Chỉ quản lý/kỹ thuật mới được đánh dấu）',
+    alreadyCleaning:'Phòng này đã có ghi chép đang dọn',
+    noStaffSelected:'Vui lòng chọn ít nhất một nhân viên',
+    cleaningInProgress:'⏳ Đang dọn',
+    completeConfirm:'Xác nhận hoàn thành dọn phòng？'
+  }
+};
+
+function t(key) { return T[state.lang][key] || key; }
+function ct(typeKey) { return CLEANING_TYPES[typeKey] ? CLEANING_TYPES[typeKey][state.lang] : typeKey; }
+function at(areaKey) { return AREAS[areaKey] ? AREAS[areaKey][state.lang] : areaKey; }
+
+// ════════════════════════════════
+//  STATE
+// ════════════════════════════════
+let state = {
+  lang: 'zh',
+  currentStaff: [],
+  isAdmin: false,
+  currentTab: 'overview',
+  floorFilter: 'all',
+  issueFilter: 'all',
+  mgmtTab: 'report',
+  staff: {},
+  roomStatus: {},
+  cleaningRecords: {},
+  issues: {},
+  inspections: {},
+  currentInspRoom: null,
+  currentInspItems: {},
+  photoUploadRecordId: null,
+  syncTime: null,
+  inspPeriod: null,
+  recFilter: 'all',
+  recentCleanRecords: {}
+};
+
+// ════════════════════════════════
+//  FIREBASE INIT
+// ════════════════════════════════
+const DB_ROOT = '/hotel1';  // ← 一館專屬路徑，與二館完全隔離
+
+let db;
+try {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+} catch(e) { console.error('Firebase init error:', e); }
+
+// 總覽用：訂閱指定日期的整房紀錄
+let _subDate = null;
+let _cleanRef = null;
+function subscribeRecords(forceDate) {
+  if (!db) return;
+  const bDate = forceDate || getBusinessDate();
+  if (_subDate === bDate && !forceDate) return;
+  if (_cleanRef) _cleanRef.off('value');
+  _subDate = bDate;
+  _cleanRef = db.ref(DB_ROOT+'/cleaning/' + bDate);
+  _cleanRef.on('value', snap => {
+    state.cleaningRecords = snap.val() || {};
+    renderRoomGrid();
+    const lbl = document.getElementById('ovDateLabel');
+    if (lbl) lbl.textContent = '業務日：' + bDate;
+  });
+}
+
+// 取得本地 YYYY-MM-DD（不用 toISOString 避免時區偏移）
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const dy = String(d.getDate()).padStart(2,'0');
+  return y+'-'+mo+'-'+dy;
+}
+
+// 手動更新總覽到今天
+function refreshOverview() {
+  const bDate = getBusinessDate();
+  subscribeRecords(bDate);
+  showToast('✅ 已更新總覽：' + bDate);
+}
+
+// 載入近 N 天的整房紀錄（不影響總覽）
+// 設定日期選擇器初始值（今天業務日）並載入
+function initRecDatePicker() {
+  const picker = document.getElementById('recDatePicker');
+  if (!picker) return;
+  if (!picker.value) picker.value = getBusinessDate();
+  loadRecordsByDate();
+}
+
+// 切換日期（prev/next/today）
+function setRecDate(dir) {
+  const picker = document.getElementById('recDatePicker');
+  if (!picker) return;
+  const cur = picker.value ? new Date(picker.value + 'T12:00:00') : new Date();
+  if (dir === 'today') {
+    picker.value = getBusinessDate();
+  } else if (dir === 'prev') {
+    cur.setDate(cur.getDate() - 1);
+    picker.value = localDateStr(cur);
+  } else if (dir === 'next') {
+    cur.setDate(cur.getDate() + 1);
+    picker.value = localDateStr(cur);
+  }
+  loadRecordsByDate();
+}
+
+// 載入指定業務日的紀錄（單日）
+function loadRecordsByDate() {
+  const picker = document.getElementById('recDatePicker');
+  const selDate = picker?.value || getBusinessDate();
+  if (picker && !picker.value) picker.value = selDate;
+  const titleEl = document.getElementById('recPageTitle');
+  if (titleEl) titleEl.textContent = `📋 ${selDate} 紀錄`;
+  const container = document.getElementById('recordsList');
+  if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">載入中...</div>';
+  db.ref(DB_ROOT+'/cleaning/' + selDate).once('value', snap => {
+    const fresh = {};
+    const data = snap.val() || {};
+    Object.entries(data).forEach(([id, r]) => { fresh[id] = {...r, _date: selDate}; });
+    state.recentCleanRecords = fresh;
+    renderRecords();
+  });
+}
+
+// 保留相容性（刪除後、切 tab 時呼叫）
+function loadRecentRecords(days) {
+  loadRecordsByDate();
+}
+
+// ════════════════════════════════
+//  UTILS
+// ════════════════════════════════
+function getBusinessDate(ts) {
+  const d = ts ? new Date(ts) : new Date();
+  if (d.getHours() < 8) { d.setDate(d.getDate() - 1); }
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const dy = String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${dy}`;
+}
+
+function formatTime(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  return d.toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
+}
+
+function formatDate(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  return d.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+}
+
+function formatDuration(startTs, endTs) {
+  if (!startTs || !endTs) return '';
+  const mins = Math.round((endTs - startTs) / 60000);
+  return mins + t('mins');
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+function showToast(msg, duration=2200) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function closeModalOverlay(e, id) { if (e.target.id === id) closeModal(id); }
+
+function isSupervisor() {
+  if (state.isAdmin) return true;
+  return state.currentStaff.some(sid => {
+    const s = state.staff[sid];
+    return s && (s.role === 'supervisor' || s.role === 'maintenance');
+  });
+}
+
+function getRoleIcon(role) {
+  if (role === 'supervisor') return '👑';
+  if (role === 'maintenance') return '🔧';
+  return '🧹';
+}
+
+// ════════════════════════════════
+//  FIREBASE LISTENERS
+// ════════════════════════════════
+function setupListeners() {
+  // Staff
+  db.ref(DB_ROOT+'/staff').on('value', snap => {
+    state.staff = snap.val() || {};
+    renderLoginStaff();
+    if (document.getElementById('mainApp') && !document.getElementById('mainApp').classList.contains('hidden')) {
+      if (state.mgmtTab === 'staff') renderManagement();
+    }
+  });
+
+  // Room status
+  db.ref(DB_ROOT+'/roomStatus').on('value', snap => {
+    state.roomStatus = snap.val() || {};
+    renderRoomGrid();
+    state.syncTime = Date.now();
+    updateSyncTime();
+  });
+
+  // Today's cleaning records
+  subscribeRecords(getBusinessDate());
+
+  // Issues
+  db.ref(DB_ROOT+'/issues').on('value', snap => {
+    state.issues = snap.val() || {};
+    if (state.currentTab === 'issues') renderIssues();
+    renderRoomGrid(); // re-render to show red flags
+  });
+
+  // Inspections
+  db.ref(DB_ROOT+'/inspections').on('value', snap => {
+    state.inspections = snap.val() || {};
+    if (state.currentTab === 'inspection') renderInspectHistory();
+  });
+
+  // Sync every 30s
+  setInterval(updateSyncTime, 30000);
+}
+
+function updateSyncTime() {
+  const el = document.getElementById('syncTime');
+  if (el && state.syncTime) {
+    const d = new Date(state.syncTime);
+    el.textContent = d.toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+}
+
+// ════════════════════════════════
+//  INIT & LOGIN
+// ════════════════════════════════
+function init() {
+  // Check if Firebase is ready
+  if (!db) { showToast('Firebase 連線中...'); setTimeout(init, 1000); return; }
+
+  // Seed default staff if none exists
+  db.ref(DB_ROOT+'/staff').once('value', snap => {
+    if (!snap.val()) {
+      const staffObj = {};
+      DEFAULT_STAFF.forEach(s => {
+        const id = uid();
+        staffObj[id] = { name: s.name, role: s.role, phone: '' };
+      });
+      db.ref(DB_ROOT+'/staff').set(staffObj);
+    }
+    renderLoginStaff();
+  });
+
+  setupListeners();
+}
+
+function buildStaffItems(ctx) {
+  const staff = Object.entries(state.staff);
+  if (!staff.length) return '<div style="text-align:center;padding:20px;color:var(--text2);">載入人員中...</div>';
+  return staff.map(([id, s]) => `
+    <div class="staff-item ${state.currentStaff.includes(id) ? 'selected' : ''}"
+         data-staff-id="${id}" data-ctx="${ctx}"
+         onclick="toggleStaffSelect('${id}','${ctx}')">
+      <div class="staff-avatar">${getRoleIcon(s.role)}</div>
+      <div class="staff-name">${s.name}</div>
+      <div class="staff-role">${ROLE_LABELS[s.role] ? ROLE_LABELS[s.role][state.lang] : s.role}</div>
+    </div>
+  `).join('');
+}
+
+function renderLoginStaff() {
+  const grid = document.getElementById('staffGrid');
+  if (grid) grid.innerHTML = buildStaffItems('login');
+}
+
+function renderShiftStaff() {
+  const grid = document.getElementById('shiftStaffGrid');
+  if (grid) grid.innerHTML = buildStaffItems('shift');
+}
+
+function toggleStaffSelect(id, ctx) {
+  const idx = state.currentStaff.indexOf(id);
+  if (idx >= 0) state.currentStaff.splice(idx, 1);
+  else state.currentStaff.push(id);
+  // Only update items within the correct container
+  const containerId = ctx === 'shift' ? 'shiftStaffGrid' : 'staffGrid';
+  const container = document.getElementById(containerId);
+  if (container) {
+    container.querySelectorAll('[data-staff-id]').forEach(el => {
+      el.classList.toggle('selected', state.currentStaff.includes(el.dataset.staffId));
+    });
+  }
+}
+
+function enterSystem() {
+  if (state.currentStaff.length === 0) {
+    showToast(t('noStaffSelected'));
+    return;
+  }
+  state.isAdmin = false;
+  showMainApp();
+}
+
+function enterAdmin() {
+  document.getElementById('adminPwdInput').value = '';
+  showModal('modalAdminPwd');
+  setTimeout(() => document.getElementById('adminPwdInput').focus(), 300);
+}
+
+const ADMIN_PWD_DEFAULT = '0000';
+
+function checkAdminPassword() {
+  const pwd = document.getElementById('adminPwdInput').value;
+  db.ref(DB_ROOT+'/config/adminPassword').once('value', snap => {
+    const stored = snap.val() || ADMIN_PWD_DEFAULT;
+    if (pwd === stored) {
+      closeModal('modalAdminPwd');
+      state.currentStaff = [];
+      state.isAdmin = true;
+      showMainApp();
+    } else {
+      showToast('❌ 密碼錯誤');
+      document.getElementById('adminPwdInput').value = '';
+      document.getElementById('adminPwdInput').focus();
+    }
+  });
+}
+
+function changeAdminPassword() {
+  const oldPwd = document.getElementById('oldPwdInput').value;
+  const newPwd = document.getElementById('newPwdInput').value;
+  const confirmPwd = document.getElementById('confirmPwdInput').value;
+  if (!newPwd) { showToast('請輸入新密碼'); return; }
+  if (newPwd !== confirmPwd) { showToast('❌ 兩次密碼不一致'); return; }
+  db.ref(DB_ROOT+'/config/adminPassword').once('value', snap => {
+    const stored = snap.val() || ADMIN_PWD_DEFAULT;
+    if (oldPwd !== stored) { showToast('❌ 舊密碼錯誤'); return; }
+    db.ref(DB_ROOT+'/config/adminPassword').set(newPwd).then(() => {
+      closeModal('modalChangePwd');
+      ['oldPwdInput','newPwdInput','confirmPwdInput'].forEach(id => document.getElementById(id).value = '');
+      showToast('✅ 密碼已更新');
+    });
+  });
+}
+
+function showMainApp() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  updateHeaderStaffNames();
+  switchTab('overview');
+  renderRoomGrid();
+}
+
+function goToLogin() {
+  closeModal('modalShift');
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+  state.currentStaff = [];
+  state.isAdmin = false;
+  renderLoginStaff();
+}
+
+function updateHeaderStaffNames() {
+  const el = document.getElementById('staffNames');
+  if (!el) return;
+  if (state.isAdmin) {
+    el.textContent = '管理員';
+  } else {
+    const names = state.currentStaff.map(id => state.staff[id] ? state.staff[id].name : '').filter(Boolean);
+    el.textContent = names.join('、');
+  }
+}
+
+function showShiftModal() {
+  renderShiftStaff(); // Render shift-specific grid (independent of login page)
+  showModal('modalShift');
+}
+
+function confirmShift() {
+  if (state.currentStaff.length === 0 && !state.isAdmin) {
+    showToast(t('noStaffSelected'));
+    return;
+  }
+  closeModal('modalShift');
+  updateHeaderStaffNames();
+  showToast('換班成功');
+}
+
+// ════════════════════════════════
+//  LANGUAGE TOGGLE
+// ════════════════════════════════
+function toggleLang() {
+  state.lang = state.lang === 'zh' ? 'vi' : 'zh';
+  applyTranslations();
+  renderRoomGrid();
+  if (state.currentTab === 'records') renderRecords();
+  if (state.currentTab === 'issues') renderIssues();
+  if (state.currentTab === 'management') renderManagement();
+}
+
+function applyTranslations() {
+  const L = T[state.lang];
+  const set = (id, key) => { const el = document.getElementById(id); if(el) el.textContent = L[key] || ''; };
+  set('lbl-appTitle','appTitle'); set('lbl-selectStaff','selectStaff');
+  set('lbl-enter','enter'); set('lbl-adminEnter','adminEnter');
+  set('lbl-langSwitch','langSwitch'); set('lbl-shift','shift');
+  set('lbl-all','all'); set('lbl-all2','all'); set('lbl-all3','all');
+  set('lbl-pending','pending'); set('lbl-resolved','resolved');
+  set('lbl-todayRecords','todayRecords'); set('lbl-issueTitle','issueTitle');
+  set('lbl-report','report'); set('lbl-inspectTitle','inspectTitle');
+  set('lbl-startCleaning','startCleaning'); set('lbl-roomNo','roomNo');
+  set('lbl-cleanType','cleanType'); set('lbl-areaAssign','areaAssign');
+  set('lbl-confirmStart','confirmStart'); set('lbl-reportIssue','reportIssue');
+  set('lbl-room','room'); set('lbl-issueDesc','issueDesc');
+  set('lbl-severity','severity'); set('lbl-submitIssue','submitIssue');
+  set('lbl-selectFloor','selectFloor'); set('lbl-selectRoom','selectRoom');
+  set('lbl-startInspect','startInspect'); set('lbl-completeInspect','completeInspect');
+  set('lbl-changeShift','changeShift'); set('lbl-confirmShift','confirmShift');
+  set('lbl-addStaff','addStaff'); set('lbl-name','name');
+  set('lbl-role','role'); set('lbl-phone','phone'); set('lbl-saveStaff','saveStaff');
+  set('lbl-mgmtReport','mgmtReport'); set('lbl-mgmtStaff','mgmtStaff');
+  set('nav-overview','navOverview'); set('nav-records','navRecords');
+  set('nav-issues','navIssues'); set('nav-inspection','navInspection');
+  set('nav-management','navManagement');
+  set('langBtn', state.lang === 'zh' ? 'langBtn_vi' : 'langBtn_zh');
+  document.getElementById('langBtn').textContent = state.lang === 'zh' ? 'VI' : 'ZH';
+
+  // Update cleaning type select options
+  const scType = document.getElementById('scType');
+  if (scType) {
+    scType.innerHTML = Object.entries(CLEANING_TYPES).map(([k,v]) =>
+      `<option value="${k}">${v[state.lang]}</option>`).join('');
+  }
+
+  // Update issue severity options
+  const issueSev = document.getElementById('issueSeverity');
+  if (issueSev) {
+    issueSev.innerHTML = `
+      <option value="low">${t('low')}</option>
+      <option value="mid">${t('mid')}</option>
+      <option value="high">${t('high')}</option>`;
+  }
+
+  // Update role options
+  const newRole = document.getElementById('newStaffRole');
+  if (newRole) {
+    newRole.innerHTML = Object.entries(ROLE_LABELS).map(([k,v]) =>
+      `<option value="${k}">${v[state.lang]}</option>`).join('');
+  }
+}
+
+// ════════════════════════════════
+//  TAB NAVIGATION
+// ════════════════════════════════
+function switchTab(tab) {
+  state.currentTab = tab;
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('tab-' + tab);
+  if (page) page.classList.add('active');
+  const navItem = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+  if (navItem) navItem.classList.add('active');
+
+  if (tab === 'records') initRecDatePicker();
+  if (tab === 'issues') renderIssues();
+  if (tab === 'inspection') { renderInspectRooms(); renderInspectHistory(); }
+  if (tab === 'management') renderManagement();
+  if (tab === 'reports') renderReports();
+}
+</script>
+<script>
+// ════════════════════════════════
+//  FLOOR FILTER
+// ════════════════════════════════
+function setFloor(floor) {
+  state.floorFilter = floor;
+  document.querySelectorAll('.floor-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.floor === floor);
+  });
+  renderRoomGrid();
+}
+
+// ════════════════════════════════
+//  ROOM STATUS COMPUTATION
+// ════════════════════════════════
+function computeRoomStatus(roomId) {
+  const records = Object.values(state.cleaningRecords);
+  const roomRecs = records.filter(r => r.room === roomId);
+  const cleaning = roomRecs.find(r => !r.endTime);
+  const completed = roomRecs.find(r => r.endTime);
+  if (cleaning) return 'cleaning';
+  if (completed) return 'completed';
+  return 'pending';
+}
+function roomHasProblem(roomId) {
+  return Object.values(state.issues).some(iss => iss.room === roomId && iss.status === 'pending');
+}
+
+function getRoomTypeLabel(roomId) {
+  const records = Object.values(state.cleaningRecords);
+  const rec = records.filter(r => r.room === roomId).sort((a, b) => (b.startTime || 0) - (a.startTime || 0))[0];
+  if (!rec) return '';
+  return `<span class="badge ${CLEANING_TYPES[rec.type] ? CLEANING_TYPES[rec.type].cls : ''}">${ct(rec.type)}</span>`;
+}
+
+function getRoomStaffLabel(roomId) {
+  const records = Object.values(state.cleaningRecords);
+  const rec = records.filter(r => r.room === roomId).sort((a, b) => (b.startTime || 0) - (a.startTime || 0))[0];
+  if (!rec || !rec.assignees) return '';
+  const names = new Set();
+  Object.values(rec.assignees).forEach(arr => {
+    if (Array.isArray(arr)) arr.forEach(sid => {
+      if (state.staff[sid]) names.add(state.staff[sid].name);
+    });
+  });
+  return [...names].join('、');
+}
+
+function getRoomTimeLabel(roomId) {
+  const records = Object.values(state.cleaningRecords);
+  const rec = records.filter(r => r.room === roomId).find(r => !r.endTime);
+  if (!rec || !rec.startTime) return '';
+  return formatTime(rec.startTime);
+}
+
+// ════════════════════════════════
+//  ROOM GRID RENDER
+// ════════════════════════════════
+function renderRoomGrid() {
+  const grid = document.getElementById('roomGrid');
+  if (!grid) return;
+
+  let rooms = [];
+  if (state.floorFilter === 'all') {
+    rooms = ALL_ROOMS;
+  } else {
+    rooms = ROOMS[state.floorFilter] || [];
+  }
+
+  grid.innerHTML = rooms.map(roomId => {
+    const status = computeRoomStatus(roomId);
+    const typeLabel = getRoomTypeLabel(roomId);
+    const staffLabel = getRoomStaffLabel(roomId);
+    const timeLabel = getRoomTimeLabel(roomId);
+    const hasIssue = roomHasProblem(roomId);
+
+    return `
+      <div class="room-card status-${status}" onclick="openRoomDetail('${roomId}')">
+        ${hasIssue ? '<div class="problem-dot"></div>' : ''}
+        <div class="room-no">${roomId}</div>
+        <div class="room-type">${typeLabel}</div>
+        <div class="room-staff">${staffLabel}</div>
+        ${timeLabel ? `<div class="room-time">⏰ ${timeLabel}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ════════════════════════════════
+//  ROOM DETAIL
+// ════════════════════════════════
+function openRoomDetail(roomId) {
+  const status = computeRoomStatus(roomId);
+
+  // Find active record
+  const records = Object.entries(state.cleaningRecords);
+  const activeEntry = records.find(([id, r]) => r.room === roomId && !r.endTime);
+  const lastEntry = records.filter(([id, r]) => r.room === roomId).sort((a,b) => (b[1].startTime||0)-(a[1].startTime||0))[0];
+
+  document.getElementById('rdRoomNo').textContent = `🏠 ${roomId}`;
+  const content = document.getElementById('rdContent');
+
+  if (activeEntry) {
+    const [recId, rec] = activeEntry;
+    content.innerHTML = `
+      <div class="card-sm" style="margin-bottom:14px;">
+        <div style="color:var(--warning);font-weight:600;font-size:15px;">⏳ ${t('statusCleaning')}</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">${t('startTime')}: ${formatTime(rec.startTime)}</div>
+        <div style="font-size:13px;margin-top:4px;">${CLEANING_TYPES[rec.type] ? `<span class="badge ${CLEANING_TYPES[rec.type].cls}">${ct(rec.type)}</span>` : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:13px;color:var(--text2);font-weight:600;">${t('areaAssign')}</div>
+        <button class="btn btn-sm btn-outline" onclick="openEditAssignees('${recId}','${roomId}')">✏️ 修改人員</button>
+      </div>
+      <div id="areaAssignDisplay_${recId}">${renderAreaAssignView(rec.assignees)}</div>
+      <div class="divider"></div>
+      <button class="btn btn-success btn-lg" onclick="completeCleaning('${recId}')">${t('complete')}</button>
+      <div style="height:10px;"></div>
+      <button class="btn btn-danger btn-lg" onclick="closeModal('modalRoomDetail');openIssueModal('${roomId}')">${t('reportIssue')}</button>
+    `;
+  } else if (status === 'pending' || status === 'problem' || status === 'completed') {
+    content.innerHTML = `
+      <div style="color:var(--text2);font-size:14px;margin-bottom:16px;">
+        ${status === 'completed' ? `✅ ${t('statusCompleted')}` : 
+          status === 'problem' ? `🔴 ${t('statusProblem')}` : `⬜ ${t('statusPending')}`}
+      </div>
+      ${lastEntry ? `
+        <div class="card-sm" style="margin-bottom:14px;font-size:13px;color:var(--text2);">
+          <div>${t('lastClean')}: ${formatTime(lastEntry[1].startTime)}</div>
+          ${lastEntry[1].endTime ? `<div>${t('endTime')}: ${formatTime(lastEntry[1].endTime)} (${formatDuration(lastEntry[1].startTime, lastEntry[1].endTime)})</div>` : ''}
+        </div>
+      ` : ''}
+      <button class="btn btn-primary btn-lg" onclick="closeModal('modalRoomDetail');openStartCleaning('${roomId}')">${t('startCleaning')}</button>
+      <div style="height:10px;"></div>
+      <button class="btn btn-danger btn-lg" onclick="closeModal('modalRoomDetail');openIssueModal('${roomId}')">${t('reportIssue')}</button>
+    `;
+  }
+
+  showModal('modalRoomDetail');
+}
+
+function renderAreaAssignView(assignees) {
+  if (!assignees) return '';
+  return `<div class="area-assign-grid">
+    ${Object.entries(AREAS).map(([key, label]) => {
+      const people = assignees[key] || [];
+      const names = people.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean);
+      return `<div class="area-block">
+        <div class="area-block-title">${label[state.lang]}</div>
+        <div style="font-size:13px;">${names.length ? names.join('、') : t('unassigned')}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ════════════════════════════════
+//  START CLEANING MODAL
+// ════════════════════════════════
+function openStartCleaning(roomId) {
+  // Check if already cleaning
+  const already = Object.values(state.cleaningRecords).find(r => r.room === roomId && !r.endTime);
+  if (already) { showToast(t('alreadyCleaning')); return; }
+
+  document.getElementById('scRoomNo').textContent = roomId;
+  document.getElementById('scRoomNo').dataset.room = roomId;
+
+  // Build area assignment grid — only current shift staff
+  const staffList = state.isAdmin
+    ? Object.entries(state.staff)
+    : state.currentStaff.map(sid => [sid, state.staff[sid]]).filter(([,s]) => s);
+  const grid = document.getElementById('areaAssignGrid');
+  grid.innerHTML = Object.entries(AREAS).map(([akey, alabel]) => `
+    <div class="area-block">
+      <div class="area-block-title">${alabel[state.lang]}</div>
+      ${[0,1,2].map(i => `
+        <div class="assign-person">
+          <select id="assign_${akey}_${i}" style="font-size:12px;">
+            <option value="">${t('selectStaffHint')}</option>
+            ${staffList.map(([sid, s]) => `<option value="${sid}">${s.name}</option>`).join('')}
+          </select>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  // No pre-selection: staff choose their own areas
+
+  showModal('modalStartCleaning');
+}
+
+function confirmStartCleaning() {
+  const roomId = document.getElementById('scRoomNo').dataset.room;
+  const type = document.getElementById('scType').value;
+
+  // Collect assignments
+  const assignees = {};
+  Object.keys(AREAS).forEach(akey => {
+    const people = [];
+    [0,1,2].forEach(i => {
+      const sel = document.getElementById(`assign_${akey}_${i}`);
+      if (sel && sel.value) people.push(sel.value);
+    });
+    assignees[akey] = [...new Set(people)];
+  });
+
+  const today = getBusinessDate();
+  const recId = uid();
+  const record = {
+    room: roomId,
+    type: type,
+    assignees: assignees,
+    startTime: Date.now(),
+    endTime: null,
+    status: 'cleaning',
+    _date: getBusinessDate()
+  };
+
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).set(record)
+    .then(() => {
+      db.ref(`${DB_ROOT}/roomStatus/${roomId}`).set({ status: 'cleaning', recordId: recId, startTime: Date.now() });
+      closeModal('modalStartCleaning');
+      showToast('✅ 開始整房');
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function completeCleaning(recId) {
+  if (!confirm(t('completeConfirm'))) return;
+  const today = getBusinessDate();
+  const rec = state.cleaningRecords[recId];
+  if (!rec) return;
+
+  const endTime = Date.now();
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).update({ endTime: endTime, status: 'completed' })
+    .then(() => {
+      db.ref(`${DB_ROOT}/roomStatus/${rec.room}`).update({ status: 'completed', endTime: endTime });
+      closeModal('modalRoomDetail');
+      showToast('✅ 完成整房');
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function openEditAssignees(recId, roomId) {
+  const rec = state.cleaningRecords[recId];
+  if (!rec) return;
+
+  // Inline edit form inside the detail modal
+  const display = document.getElementById(`areaAssignDisplay_${recId}`);
+  if (!display) return;
+
+  // Use all staff (or current shift)
+  const staffList = state.isAdmin
+    ? Object.entries(state.staff)
+    : state.currentStaff.map(sid => [sid, state.staff[sid]]).filter(([,s]) => s);
+
+  display.innerHTML = `
+    <div class="area-assign-grid" id="editAreaGrid_${recId}">
+      ${Object.entries(AREAS).map(([akey, alabel]) => {
+        const curPeople = (rec.assignees && rec.assignees[akey]) || [];
+        return `<div class="area-block">
+          <div class="area-block-title">${alabel[state.lang]}</div>
+          ${[0,1,2].map(i => `
+            <select id="edit_${akey}_${i}_${recId}" style="font-size:12px;margin-bottom:4px;">
+              <option value="">—</option>
+              ${staffList.map(([sid, s]) => `<option value="${sid}" ${curPeople[i]===sid?'selected':''}>${s.name}</option>`).join('')}
+            </select>
+          `).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    <button class="btn btn-primary w-full mt-3" onclick="saveEditAssignees('${recId}')">💾 儲存人員</button>
+  `;
+}
+
+function saveEditAssignees(recId) {
+  const today = getBusinessDate();
+  const assignees = {};
+  Object.keys(AREAS).forEach(akey => {
+    const people = [];
+    [0,1,2].forEach(i => {
+      const sel = document.getElementById(`edit_${akey}_${i}_${recId}`);
+      if (sel && sel.value) people.push(sel.value);
+    });
+    assignees[akey] = [...new Set(people)];
+  });
+
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}/assignees`).set(assignees)
+    .then(() => {
+      showToast('✅ 人員已更新');
+      // Refresh display
+      const rec = state.cleaningRecords[recId];
+      const display = document.getElementById(`areaAssignDisplay_${recId}`);
+      if (display && rec) {
+        const merged = { ...rec, assignees };
+        display.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;display:none;"></div>
+          ${renderAreaAssignView(assignees)}
+          <button class="btn btn-sm btn-outline mt-2" onclick="openEditAssignees('${recId}','')">✏️ 再次修改</button>
+        `;
+      }
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ════ RECORDS TAB ════
+
+// ════════════════════════════════
+//  PHOTO UPLOAD
+// ════════════════════════════════
+function triggerPhotoUpload(recId) {
+  state.photoUploadRecordId = recId;
+  document.getElementById('photoInput').click();
+}
+
+function handlePhotoUpload(event) {
+  const files = Array.from(event.target.files);
+  const recId = state.photoUploadRecordId;
+  if (!files.length || !recId) return;
+
+  const today = getBusinessDate();
+
+  files.forEach(file => {
+    const photoId = uid();
+    showToast('📸 壓縮處理中...');
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        // Compress: max 800px wide, JPEG 70%
+        const canvas = document.createElement('canvas');
+        const MAX_W = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+
+        const uploader = state.currentStaff.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean).join('、') || '管理員';
+        db.ref(`${DB_ROOT}/cleaning/${today}/${recId}/photos/${photoId}`).set({
+          url: base64, uploadedBy: uploader, uploadedAt: Date.now()
+        }).then(() => showToast('✅ 照片已儲存'))
+          .catch(e => showToast('❌ 儲存失敗: ' + e.message));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  event.target.value = '';
+}
+
+function openLightbox(url) {
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+}
+</script>
+<script>
+// ════════════════════════════════
+//  ISSUES TAB
+// ════════════════════════════════
+function setIssueFilter(filter) {
+  state.issueFilter = filter;
+  document.querySelectorAll('.issue-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
+  renderIssues();
+}
+
+function renderIssues() {
+  const container = document.getElementById('issuesList');
+  if (!container) return;
+
+  let issues = Object.entries(state.issues).sort((a,b) => (b[1].createdAt||0)-(a[1].createdAt||0));
+
+  if (state.issueFilter === 'pending') issues = issues.filter(([,v]) => v.status === 'pending');
+  if (state.issueFilter === 'resolved') issues = issues.filter(([,v]) => v.status === 'resolved');
+
+  if (issues.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div>${t('noIssues')}</div>`;
+    return;
+  }
+
+  const sevCls = {low:'sev-low', mid:'sev-mid', high:'sev-high'};
+  const sevLabel = {low:t('low'), mid:t('mid'), high:t('high')};
+
+  container.innerHTML = issues.map(([issId, iss]) => `
+    <div class="issue-card">
+      <div class="issue-top">
+        <div>
+          <div class="issue-room">🏠 ${iss.room || '-'}</div>
+          <div class="issue-meta">${formatDate(iss.createdAt)} ${formatTime(iss.createdAt)} ${iss.reportedBy ? '| ' + iss.reportedBy : ''}</div>
+        </div>
+        <span class="severity-badge ${sevCls[iss.severity] || ''}">${sevLabel[iss.severity] || iss.severity}</span>
+      </div>
+      <div class="issue-desc">${iss.desc || ''}</div>
+      ${iss.status === 'resolved' ? `
+        <div style="font-size:12px;color:var(--success);margin-top:6px;">
+          ✅ ${formatDate(iss.resolvedAt)} ${formatTime(iss.resolvedAt)} ${iss.resolvedBy ? '- ' + iss.resolvedBy : ''}
+        </div>
+      ` : `
+        <div class="issue-actions">
+          ${isSupervisor() ? `
+            <button class="btn btn-sm btn-success" onclick="resolveIssue('${issId}')">
+              ${t('resolveIssue')}
+            </button>
+          ` : `<span style="font-size:11px;color:var(--text2);">${t('supervisorOnly')}</span>`}
+        </div>
+      `}
+      ${state.isAdmin ? `<div style="text-align:right;margin-top:4px;">
+        <button class="btn btn-sm btn-danger" style="opacity:.7;" onclick="adminDeleteIssue('${issId}')">🗑 刪除</button>
+      </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function openIssueModal(roomId) {
+  // Populate room select
+  const sel = document.getElementById('issueRoom');
+  sel.innerHTML = ALL_ROOMS.map(r => `<option value="${r}" ${r===roomId?'selected':''}>${r}</option>`).join('');
+  document.getElementById('issueDesc').value = '';
+  document.getElementById('issueSeverity').value = 'low';
+  showModal('modalIssue');
+}
+
+function submitIssue() {
+  const room = document.getElementById('issueRoom').value;
+  const desc = document.getElementById('issueDesc').value.trim();
+  const severity = document.getElementById('issueSeverity').value;
+
+  if (!desc) { showToast('請填寫問題描述'); return; }
+
+  const reporterNames = state.currentStaff.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean).join('、') || '管理員';
+
+  db.ref(DB_ROOT+'/issues/' + uid()).set({
+    room, desc, severity,
+    status: 'pending',
+    reportedBy: reporterNames,
+    createdAt: Date.now()
+  }).then(() => {
+    closeModal('modalIssue');
+    showToast('✅ 問題已回報');
+    if (state.currentTab === 'issues') renderIssues();
+  }).catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function resolveIssue(issId) {
+  const resolverNames = state.isAdmin ? '管理員' :
+    state.currentStaff.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean).join('、');
+
+  db.ref(DB_ROOT+'/issues/' + issId).update({
+    status: 'resolved',
+    resolvedBy: resolverNames,
+    resolvedAt: Date.now()
+  }).then(() => {
+    showToast('✅ 已標記解決');
+  }).catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ════════════════════════════════
+//  INSPECTION TAB
+// ════════════════════════════════
+function renderInspectRooms() {
+  const floor = document.getElementById('inspFloor') ? document.getElementById('inspFloor').value : 'all';
+  const sel = document.getElementById('inspRoom');
+  if (!sel) return;
+  let rooms = floor === 'all' ? ALL_ROOMS : (ROOMS[floor] || []);
+  sel.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+}
+
+// ── Overview ──
+function setOvFloor(floor) {
+  state.ovFloor = floor;
+  document.querySelectorAll('[data-ov]').forEach(b => b.classList.toggle('active', b.dataset.ov === floor));
+  renderInspectOverview();
+}
+
+function renderInspectOverview() {
+  const grid = document.getElementById('inspOverviewGrid');
+  if (!grid) return;
+  const now = Date.now();
+  const cutoff = now - (10 * 24 * 60 * 60 * 1000);
+  // Use custom period if set, else last 10 days
+  const periodStart = state.inspPeriod && state.inspPeriod.start
+    ? new Date(state.inspPeriod.start + 'T08:00:00').getTime()
+    : cutoff;
+  const periodEnd = state.inspPeriod && state.inspPeriod.end
+    ? new Date(state.inspPeriod.end + 'T23:59:59').getTime()
+    : now;
+
+  const roomLatest = {};
+  Object.values(state.inspections).forEach(insp => {
+    if (!insp.time || insp.time < periodStart || insp.time > periodEnd) return;
+    const r = insp.room;
+    if (!roomLatest[r] || insp.time > roomLatest[r].time) roomLatest[r] = insp;
+  });
+  const rooms = (state.ovFloor && state.ovFloor !== 'all') ? (ROOMS[state.ovFloor]||[]) : ALL_ROOMS;
+  grid.innerHTML = rooms.map(roomId => {
+    const insp = roomLatest[roomId];
+    return `<div class="ov-room ${insp ? 'ov-inspected' : ''}" onclick="inspectRoom('${roomId}')">
+      <div class="ov-no">${roomId}</div>
+      ${insp
+        ? `<div class="ov-date" style="font-size:10px;color:var(--primary);">${formatDate(insp.time)}</div>
+           <div style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${insp.inspector||''}</div>`
+        : `<div class="ov-status" style="font-size:10px;color:var(--text3);">未查</div>`}
+    </div>`;
+  }).join('');
+}
+
+function inspectRoom(roomId) {
+  const sel = document.getElementById('inspRoom');
+  if (sel) sel.value = roomId;
+  startInspection();
+}
+
+// ── Start Inspection ──
+function startInspection() {
+  const roomId = document.getElementById('inspRoom').value;
+  if (!roomId) return;
+  state.currentInspRoom = roomId;
+  // Pre-set all items to OK by default
+  state.currentInspItems = {};
+  INSPECTION_CATEGORIES.forEach(cat => {
+    cat.items.forEach(item => {
+      state.currentInspItems[item.id] = { status: 'ok', reason: '' };
+    });
+  });
+
+  // Last clean info
+  const records = Object.values(state.cleaningRecords);
+  const lastRec = records.filter(r => r.room === roomId).sort((a,b)=>(b.startTime||0)-(a.startTime||0))[0];
+  document.getElementById('inspModalTitle').textContent = `🔍 查房 — ${roomId}`;
+
+  const lastInfo = document.getElementById('lastCleanInfo');
+  if (lastRec) {
+    const cleanStaff = getCleanStaffNames(lastRec);
+    const statusText = lastRec.endTime ? '✅ 已完成' : '⏳ 整理中';
+    lastInfo.innerHTML = `
+      <div style="font-weight:600;margin-bottom:2px;">${statusText}</div>
+      <div>整房人員：${cleanStaff}</div>
+      <div>開始：${formatTime(lastRec.startTime)}${lastRec.endTime?' ｜ 結束：'+formatTime(lastRec.endTime):''}</div>
+      <div style="margin-top:2px;"><span class="badge ${CLEANING_TYPES[lastRec.type]?.cls||''}">${ct(lastRec.type)}</span></div>`;
+    state._lastRec = lastRec;
+  } else {
+    lastInfo.textContent = '今日尚無整房紀錄';
+    state._lastRec = null;
+  }
+  renderChecklist();
+  showModal('modalInspection');
+}
+
+function getCleanStaffNames(rec) {
+  if (!rec || !rec.assignees) return '無';
+  const people = new Set();
+  Object.values(rec.assignees).forEach(arr => {
+    if (Array.isArray(arr)) arr.forEach(sid => { if(sid) people.add(sid); });
+  });
+  return [...people].map(sid => state.staff[sid]?.name||'').filter(Boolean).join('、') || '無';
+}
+
+// ── Checklist rendering ──
+function renderChecklist() {
+  const container = document.getElementById('checklistItems');
+  container.innerHTML = INSPECTION_CATEGORIES.map(cat => `
+    <div style="margin-bottom:18px;">
+      <div class="insp-cat-title">${cat.label}</div>
+      ${cat.items.map(item => renderInspItem(item)).join('')}
+    </div>
+  `).join('');
+  updateCheckProgress();
+}
+
+function renderInspItem(item) {
+  const cur = state.currentInspItems[item.id] || {};
+  const st = cur.status;
+  return `<div class="insp-item" id="insp_${item.id}">
+    <div class="insp-item-row">
+      <div class="insp-item-name">
+        ${item.name}${item.qty?`<span class="insp-item-qty"> (${item.qty})</span>`:''}
+      </div>
+      <div class="insp-btns">
+        <button class="insp-btn ${st==='ok'?'insp-ok':''}"     onclick="setItemStatus('${item.id}','ok')">✓ OK</button>
+        <button class="insp-btn ${st==='defect'?'insp-defect':''}" onclick="setItemStatus('${item.id}','defect')">⚠ 缺失</button>
+        <button class="insp-btn ${st==='na'?'insp-na':''}"     onclick="setItemStatus('${item.id}','na')">N/A</button>
+      </div>
+    </div>
+    ${st==='defect' ? `<input class="insp-reason" type="text" placeholder="請填寫缺失原因…"
+      value="${(cur.reason||'').replace(/"/g,'&quot;')}"
+      oninput="setItemReason('${item.id}',this.value)">` : ''}
+  </div>`;
+}
+
+function setItemStatus(itemId, newStatus) {
+  if (!state.currentInspItems[itemId]) state.currentInspItems[itemId] = {};
+  const prev = state.currentInspItems[itemId].status;
+  // Toggle: click same button again to unset
+  state.currentInspItems[itemId].status = (prev === newStatus) ? null : newStatus;
+  if (newStatus !== 'defect') state.currentInspItems[itemId].reason = '';
+  // Re-render this item only
+  const itemDef = findItemById(itemId);
+  if (itemDef) {
+    const el = document.getElementById(`insp_${itemId}`);
+    if (el) el.outerHTML = renderInspItem(itemDef);
+  }
+  updateCheckProgress();
+}
+
+function findItemById(id) {
+  for (const cat of INSPECTION_CATEGORIES)
+    for (const item of cat.items)
+      if (item.id === id) return item;
+  return null;
+}
+
+function setItemReason(itemId, reason) {
+  if (!state.currentInspItems[itemId]) state.currentInspItems[itemId] = {};
+  state.currentInspItems[itemId].reason = reason;
+}
+
+function updateCheckProgress() {
+  const allItems = INSPECTION_CATEGORIES.flatMap(c => c.items);
+  const total = allItems.length;
+  const done  = allItems.filter(i => state.currentInspItems[i.id]?.status).length;
+  const pct   = Math.round((done/total)*100);
+  const bar   = document.getElementById('inspProgress');
+  const lbl   = document.getElementById('inspProgressLabel');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = `${done}/${total}`;
+}
+
+// ── Complete Inspection ──
+function completeInspection() {
+  const roomId = state.currentInspRoom;
+  if (!roomId) return;
+  const allItems = INSPECTION_CATEGORIES.flatMap(c => c.items);
+  const setCount  = allItems.filter(i => state.currentInspItems[i.id]?.status).length;
+  const defects   = allItems.filter(i => state.currentInspItems[i.id]?.status === 'defect');
+
+  const inspectorNames = state.isAdmin ? '管理員' :
+    state.currentStaff.map(sid => state.staff[sid]?.name||'').filter(Boolean).join('、');
+
+  const lastRec = state._lastRec || null;
+  const cleanStaff  = lastRec ? getCleanStaffNames(lastRec) : '無';
+  const cleanStatus = lastRec ? (lastRec.endTime ? '已完成' : '整理中') : '今日未整';
+
+  const record = {
+    room: roomId,
+    inspector: inspectorNames,
+    date: getBusinessDate(),
+    time: Date.now(),
+    cleaningStaff: cleanStaff,
+    cleaningStatus: cleanStatus,
+    cleaningStartTime: lastRec?.startTime || null,
+    cleaningEndTime:   lastRec?.endTime   || null,
+    cleaningType: lastRec?.type || null,
+    items: state.currentInspItems,
+    totalItems: allItems.length,
+    setCount: setCount,
+    defectCount: defects.length
+  };
+
+  db.ref(DB_ROOT+'/inspections/' + uid()).set(record)
+    .then(() => {
+      closeModal('modalInspection');
+      showToast(`✅ 查房完成 共 ${defects.length} 項缺失`);
+      renderInspectOverview();
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function renderInspectHistory() {
+  renderInspectOverview();
+}
+
+// ── Export Inspection Excel ──
+function exportInspectionExcel() {
+  const now  = Date.now();
+  const cutoff = now - (30 * 24 * 60 * 60 * 1000);
+  const allItems = INSPECTION_CATEGORIES.flatMap(c => c.items);
+
+  const records = Object.values(state.inspections)
+    .filter(r => r.time && r.time >= cutoff)
+    .sort((a,b) => (a.time||0)-(b.time||0));
+
+  if (!records.length) { showToast('30天內無查房紀錄'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: 查房紀錄總表 ──
+  const h1 = ['房號','查房日期','查房時間','查房人員','整房人員','整房狀態','整房類型','整房開始','整房結束','缺失數','缺失項目','缺失原因'];
+  const rows1 = records.map(rec => {
+    const defs = allItems.filter(i => rec.items?.[i.id]?.status==='defect');
+    return [
+      rec.room, rec.date||'',
+      rec.time ? new Date(rec.time).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) : '',
+      rec.inspector||'',
+      rec.cleaningStaff||'',
+      rec.cleaningStatus||'',
+      rec.cleaningType ? (CLEANING_TYPES[rec.cleaningType]?.zh||rec.cleaningType) : '',
+      rec.cleaningStartTime ? formatTime(rec.cleaningStartTime) : '',
+      rec.cleaningEndTime   ? formatTime(rec.cleaningEndTime)   : '',
+      defs.length,
+      defs.map(i=>i.name).join('、'),
+      defs.map(i=>`${i.name}: ${rec.items[i.id].reason||''}`.trim()).join('；')
+    ];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([h1, ...rows1]);
+  ws1['!cols'] = [6,10,8,10,12,8,10,8,8,6,35,40].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, '查房紀錄');
+
+  // ── Sheet 2: 逐項明細 ──
+  const h2 = ['房號','查房日期','查房人員','整房人員','整房狀態','類別','檢查項目','數量','狀態','缺失原因'];
+  const rows2 = [];
+  records.forEach(rec => {
+    INSPECTION_CATEGORIES.forEach(cat => {
+      cat.items.forEach(item => {
+        const s = rec.items?.[item.id];
+        if (!s || !s.status) return;
+        rows2.push([
+          rec.room, rec.date||'', rec.inspector||'', rec.cleaningStaff||'', rec.cleaningStatus||'',
+          cat.label, item.name, item.qty||'',
+          s.status==='ok'?'✓ OK': s.status==='defect'?'⚠ 缺失':'N/A 無設備',
+          s.reason||''
+        ]);
+      });
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([h2, ...rows2]);
+  ws2['!cols'] = [6,10,10,12,8,8,22,6,10,30].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws2, '查房明細');
+
+  const today = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `查房紀錄_${today}.xlsx`);
+  showToast('✅ 查房報表已下載');
+}
+
+// ════════════════════════════════
+//  MANAGEMENT TAB
+// ════════════════════════════════
+function renderManagement() {
+  const container = document.getElementById('mgmtContent');
+  if (!container) return;
+  renderStaffManagement(container);
+}
+
+function renderStaffManagement(container) {
+  const staffList = Object.entries(state.staff);
+  const isAdm = state.isAdmin;
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-weight:600;">${t('mgmtStaff')}</div>
+        ${isAdm ? `<button class="btn btn-sm btn-primary" onclick="showModal('modalAddStaff')">＋ ${t('addStaff')}</button>` : '<span style="font-size:11px;color:var(--text3);">僅管理員可新增</span>'}
+      </div>
+      ${staffList.length === 0 ? `<div style="color:var(--text2);font-size:14px;">尚無人員</div>` :
+        staffList.map(([sid, s]) => `
+          <div class="staff-row">
+            <div>
+              <div style="font-weight:600;">${getRoleIcon(s.role)} ${s.name}</div>
+              <div style="font-size:12px;color:var(--text2);">${ROLE_LABELS[s.role] ? ROLE_LABELS[s.role][state.lang] : s.role}${s.phone ? ' ｜ ' + s.phone : ''}</div>
+            </div>
+            ${isAdm ? `<button class="btn btn-sm btn-danger" onclick="deleteStaff('${sid}')">刪除</button>` : ''}
+          </div>
+        `).join('')}
+    </div>
+    ${isAdm ? `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:600;margin-bottom:10px;">🔑 管理員設定</div>
+        <button class="btn btn-outline btn-sm w-full" onclick="showModal('modalChangePwd')">修改管理員密碼</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;">預設密碼：0000</div>
+      </div>
+    ` : ''}
+  `;
+}
+
+function submitAddStaff() {
+  const name = document.getElementById('newStaffName').value.trim();
+  const role = document.getElementById('newStaffRole').value;
+  const phone = document.getElementById('newStaffPhone').value.trim();
+
+  if (!name) { showToast('請填寫姓名'); return; }
+
+  db.ref(DB_ROOT+'/staff/' + uid()).set({ name, role, phone })
+    .then(() => {
+      closeModal('modalAddStaff');
+      document.getElementById('newStaffName').value = '';
+      document.getElementById('newStaffPhone').value = '';
+      showToast('✅ 人員已新增');
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ── 管理員修改整房紀錄 ──
+function openEditRecord(recId) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可修改'); return; }
+  const rec = state.recentCleanRecords[recId] || state.cleaningRecords[recId];
+  if (!rec) { showToast('❌ 找不到紀錄'); return; }
+
+  const staffEntries = Object.entries(state.staff);
+  const recDate = rec._date || getBusinessDate();
+
+  // 各區人員選單 HTML
+  const areaSelects = Object.entries(AREAS).map(([akey, alabel]) => {
+    const curPeople = (rec.assignees && rec.assignees[akey]) || [];
+    const selects = [0,1,2].map(i => `
+      <select id="er_${akey}_${i}" style="width:100%;margin-bottom:4px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-size:13px;">
+        <option value="">—</option>
+        ${staffEntries.map(([sid,s]) => `<option value="${sid}" ${curPeople[i]===sid?'selected':''}>${s.name}</option>`).join('')}
+      </select>`).join('');
+    return `<div style="margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px;">${alabel[state.lang]}</div>
+      ${selects}
+    </div>`;
+  }).join('');
+
+  document.getElementById('editRecordContent').innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+      🏠 ${rec.room} ｜ ${recDate} ｜ ${formatTime(rec.startTime)}
+    </div>
+
+    <div class="form-group">
+      <label>整理類型</label>
+      <select id="er_type" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:14px;">
+        ${Object.entries(CLEANING_TYPES).map(([k,v]) =>
+          `<option value="${k}" ${rec.type===k?'selected':''}>${v.zh}</option>`
+        ).join('')}
+      </select>
+    </div>
+
+    <div style="font-weight:600;font-size:13px;margin:12px 0 8px;">👥 整房人員</div>
+    ${areaSelects}
+
+    <button class="btn btn-primary btn-lg" onclick="saveEditRecord('${recId}','${recDate}')">💾 儲存修改</button>
+  `;
+  showModal('modalEditRecord');
+}
+
+function saveEditRecord(recId, recDate) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可修改'); return; }
+  const typeEl = document.getElementById('er_type');
+  const newType = typeEl ? typeEl.value : null;
+
+  const assignees = {};
+  Object.keys(AREAS).forEach(akey => {
+    const people = [];
+    [0,1,2].forEach(i => {
+      const sel = document.getElementById(`er_${akey}_${i}`);
+      if (sel && sel.value) people.push(sel.value);
+    });
+    assignees[akey] = [...new Set(people)];
+  });
+
+  const updates = { assignees };
+  if (newType) updates.type = newType;
+
+  db.ref(`${DB_ROOT}/cleaning/${recDate}/${recId}`).update(updates)
+    .then(() => {
+      showToast('✅ 紀錄已修改');
+      closeModal('modalEditRecord');
+      loadRecordsByDate();
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function deleteStaff(sid) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可刪除人員'); return; }
+  if (!confirm(t('deleteConfirm'))) return;
+  db.ref(DB_ROOT+'/staff/' + sid).remove()
+    .then(() => showToast('✅ 已刪除'))
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function adminDeleteRecord(recId) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可刪除'); return; }
+  if (!confirm('確定要刪除此整房紀錄？')) return;
+  // 優先從近7天紀錄（recentCleanRecords）查，才有正確的 _date；再 fallback 到今日總覽
+  const rec = state.recentCleanRecords[recId] || state.cleaningRecords[recId];
+  const recDate = rec?._date || getBusinessDate();
+  db.ref(`${DB_ROOT}/cleaning/${recDate}/${recId}`).remove().then(() => {
+    if (rec) db.ref(`${DB_ROOT}/roomStatus/${rec.room}`).remove();
+    showToast('✅ 紀錄已刪除');
+    // 刪除後重新載入紀錄列表，讓畫面即時更新
+    loadRecentRecords(7);
+  }).catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function adminDeleteIssue(issId) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可刪除'); return; }
+  if (!confirm('確定要刪除此問題紀錄？')) return;
+  db.ref(`${DB_ROOT}/issues/${issId}`).remove()
+    .then(() => showToast('✅ 問題已刪除'))
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function adminDeleteInspection(inspId) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可刪除'); return; }
+  if (!confirm('確定要刪除此查房紀錄？')) return;
+  db.ref(`${DB_ROOT}/inspections/${inspId}`).remove()
+    .then(() => showToast('✅ 查房紀錄已刪除'))
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ════════════════════════════════
+//  REPORT
+// ════════════════════════════════
+// ─── Helper: get type category ───
+function getTypeCategory(type) {
+  if (type === 'normal' || type === 'rush') return 'clean';
+  if (type === 'deep') return 'maintain';
+  if (type === 'stair') return 'stair';
+  if (type === 'garage') return 'garage';
+  return 'clean';
+}
+
+// ─── Helper: credits per person = 1/unique_people (2 decimal) ───
+function getStaffCredits(rec) {
+  if (!rec.assignees) return {};
+  const people = new Set();
+  Object.values(rec.assignees).forEach(arr => {
+    if (Array.isArray(arr)) arr.forEach(sid => { if(sid) people.add(sid); });
+  });
+  if (people.size === 0) return {};
+  const credit = Math.round((1 / people.size) * 100) / 100;
+  const result = {};
+  people.forEach(sid => { result[sid] = credit; });
+  return result;
+}
+
+// ─── Aggregate records → staff stats {clean, maintain, stair, garage} ───
+function aggregateStats(records) {
+  const stats = {};
+  records.forEach(rec => {
+    if (!rec.endTime) return;
+    const credits = getStaffCredits(rec);
+    const cat = getTypeCategory(rec.type);
+    Object.entries(credits).forEach(([sid, credit]) => {
+      if (!stats[sid]) stats[sid] = { clean:0, maintain:0, stair:0, garage:0 };
+      stats[sid][cat] = Math.round((stats[sid][cat] + credit) * 100) / 100;
+    });
+  });
+  return stats;
+}
+
+function renderReport(container) {
+  const bDate = getBusinessDate();
+  const records = Object.entries(state.cleaningRecords)
+    .sort((a,b) => (a[1].startTime||0)-(b[1].startTime||0));
+  const recVals = records.map(([,r]) => r);
+  const dailyStats = aggregateStats(recVals);
+
+  const tableRows = records.map(([, rec]) => {
+    const areaStr = Object.entries(AREAS).map(([akey, alabel]) => {
+      const people = (rec.assignees && rec.assignees[akey]) || [];
+      const names = people.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean);
+      return names.length ? `${alabel[state.lang]}:${names.join('/')}` : '';
+    }).filter(Boolean).join(' ');
+    return `<tr>
+      <td style="padding:5px 4px;">${rec.room}</td>
+      <td style="padding:5px 4px;">${formatTime(rec.startTime)}</td>
+      <td style="padding:5px 4px;">${rec.endTime ? formatTime(rec.endTime) : '⏳'}</td>
+      <td style="padding:5px 4px;"><span class="badge ${CLEANING_TYPES[rec.type]?.cls||''}">${ct(rec.type)}</span></td>
+      <td style="padding:5px 4px;font-size:11px;">${areaStr}</td>
+    </tr>`;
+  }).join('');
+
+  const staffCountRows = Object.entries(dailyStats).map(([sid, s]) => {
+    const staff = state.staff[sid];
+    if (!staff) return '';
+    return `<div class="report-row">
+      <div style="flex:1;font-weight:600;">${staff.name}</div>
+      <div style="font-size:12px;color:var(--text2);">
+        整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 樓梯 <b>${s.stair}</b> ｜ 車庫 <b>${s.garage}</b>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:16px;margin-bottom:4px;">📊 今日報表</div>
+      <div style="font-size:13px;color:var(--text2);">${bDate} (08:00 ~ 隔日 07:59)</div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;">👥 今日員工間數</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
+        整房/趕房 各算 1÷人數 間｜保養/樓梯/車庫 另計，計算至小數第2位
+      </div>
+      ${staffCountRows || `<div style="color:var(--text2);font-size:14px;">尚無完成紀錄</div>`}
+    </div>
+    <div class="card" style="margin-bottom:12px;overflow-x:auto;">
+      <div style="font-weight:600;margin-bottom:10px;">🧹 整房流水表</div>
+      ${records.length === 0 ? `<div style="color:var(--text2);">尚無紀錄</div>` : `
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+            <th style="padding:5px 4px;text-align:left;">房號</th>
+            <th style="padding:5px 4px;text-align:left;">開始</th>
+            <th style="padding:5px 4px;text-align:left;">結束</th>
+            <th style="padding:5px 4px;text-align:left;">類型</th>
+            <th style="padding:5px 4px;text-align:left;">人員/區域</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>`}
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:6px;">📅 月統計</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">統計當月所有業務日完成紀錄</div>
+      <button class="btn btn-outline btn-sm" onclick="showMonthlyStats()">查看本月統計</button>
+    </div>
+    <div id="monthlyStatsArea"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      <button class="btn btn-success btn-lg" onclick="exportExcel(false)">
+        📊 匯出今日 Excel
+      </button>
+      <button class="btn btn-primary btn-lg" onclick="exportExcel(true)">
+        📅 匯出月報表 Excel + 寄信
+      </button>
+    </div>
+  `;
+}
+
+// ─── Excel Export (SheetJS) ───
+function buildWorkbook(bDate, records, monthlyStats) {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: 流水表
+  const logHeaders = ['房號','開始時間','結束時間','整理類型','房間','中間','廁所','樓梯保養','車庫保養','用時(分)'];
+  const logRows = records.map(rec => {
+    const g = key => {
+      const arr = (rec.assignees && rec.assignees[key]) || [];
+      return arr.map(sid => state.staff[sid]?.name || '').filter(Boolean).join('、');
+    };
+    const dur = rec.endTime ? Math.round((rec.endTime - rec.startTime)/60000) : '';
+    return [
+      rec.room,
+      rec.startTime ? formatTime(rec.startTime) : '',
+      rec.endTime   ? formatTime(rec.endTime) : '整理中',
+      CLEANING_TYPES[rec.type]?.zh || rec.type,
+      g('room'), g('middle'), g('bathroom'), g('stair'), g('garage'), dur
+    ];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([logHeaders, ...logRows]);
+  ws1['!cols'] = [6,8,8,10,10,10,10,12,12,8].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, '整房流水表');
+
+  // Sheet 2: 員工每日統計
+  const dayStats = aggregateStats(records.filter(r => r.endTime));
+  const dayHeaders = ['姓名','職位','整房間數(正常+趕房)','保養間數(大保養)','樓梯保養間數','車庫保養間數','合計'];
+  const dayRows = Object.entries(dayStats).map(([sid, s]) => {
+    const st = state.staff[sid];
+    const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+    return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([dayHeaders, ...dayRows]);
+  ws2['!cols'] = [10,8,18,14,12,12,8].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws2, '員工每日間數');
+
+  // Sheet 3: 月統計
+  if (monthlyStats) {
+    const moHeaders = ['姓名','職位','整房間數','保養間數','樓梯保養間數','車庫保養間數','合計'];
+    const moRows = Object.entries(monthlyStats).map(([sid, s]) => {
+      const st = state.staff[sid];
+      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+      return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+    });
+    const ws3 = XLSX.utils.aoa_to_sheet([moHeaders, ...moRows]);
+    ws3['!cols'] = [10,8,10,10,12,12,8].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws3, '員工月統計');
+  }
+  return wb;
+}
+
+function exportExcel(withMonthly) {
+  const bDate = getBusinessDate();
+  showToast('載入資料中...');
+  // 從 Firebase 重新讀取，確保取得刪除後的最新資料
+  db.ref(DB_ROOT+'/cleaning/' + bDate).once('value', snap => {
+    const records = Object.values(snap.val() || {})
+      .sort((a,b)=>(a.startTime||0)-(b.startTime||0));
+    // 同步更新記憶體快取
+    state.cleaningRecords = snap.val() || {};
+
+  if (!withMonthly) {
+    const wb = buildWorkbook(bDate, records, null);
+    XLSX.writeFile(wb, `整房報表_${bDate}.xlsx`);
+    showToast('✅ Excel 已下載');
+    return;
+  }
+
+  // Fetch monthly data then export + open email
+  const now = new Date();
+  const prefix = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  showToast('載入月資料中...');
+  db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(prefix).endAt(prefix+'\uf8ff').once('value', snap => {
+    const allData = snap.val() || {};
+    const allRecs = [];
+    Object.values(allData).forEach(d => Object.values(d).forEach(r => allRecs.push(r)));
+    const monthlyStats = aggregateStats(allRecs.filter(r => r.endTime));
+    const wb = buildWorkbook(bDate, records, monthlyStats);
+    const fileName = `整房月報表_${prefix}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    showToast('✅ Excel 已下載，請附加至郵件');
+    setTimeout(() => {
+      const subj = encodeURIComponent(`整房報表 ${bDate}`);
+      const body = encodeURIComponent(`您好，\n\n附件為 ${bDate} 整房管理報表，請查收。\n（請手動附加下載的 Excel 檔案：${fileName}）\n\n整房管理系統`);
+      window.open(`mailto:${REPORT_EMAIL}?subject=${subj}&body=${body}`, '_blank');
+    }, 1500);
+  });
+  }); // 外層 Firebase once 結束
+}
+
+function showMonthlyStats() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const prefix = `${year}-${String(month).padStart(2,'0')}`;
+
+  showToast('載入中...');
+  db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(prefix).endAt(prefix+'\uf8ff').once('value', snap => {
+    const allData = snap.val() || {};
+    const allRecs = [];
+    Object.values(allData).forEach(d => Object.values(d).forEach(r => allRecs.push(r)));
+    const stats = aggregateStats(allRecs.filter(r => r.endTime));
+
+    const rows = Object.entries(stats).map(([sid, s]) => {
+      const staff = state.staff[sid];
+      if (!staff) return '';
+      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+      return `<div class="report-row">
+        <div style="flex:1;font-weight:600;">${staff.name}</div>
+        <div style="font-size:12px;color:var(--text2);">
+          整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 樓梯 <b>${s.stair}</b> ｜ 車庫 <b>${s.garage}</b> ｜ 合計 <b>${total}</b>
+        </div>
+      </div>`;
+    }).join('');
+
+    const area = document.getElementById('monthlyStatsArea');
+    if (area) {
+      area.innerHTML = `
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:600;margin-bottom:8px;">📅 ${year}年${month}月 員工月結表</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
+            整房間數 ｜ 保養間數 ｜ 樓梯保養間數 ｜ 車庫保養間數
+          </div>
+          ${rows || '<div style="color:var(--text2);">本月尚無資料</div>'}
+        </div>`;
+    }
+    showToast(`✅ ${year}/${month} 月統計已載入`);
+  });
+}
+
+
+// ════════════════════════════════
+//  RECORDS TAB (combined)
+// ════════════════════════════════
+function setRecFilter(f) {
+  state.recFilter = f;
+  document.querySelectorAll('[data-rec]').forEach(b => b.classList.toggle('active', b.dataset.rec === f));
+  renderRecords();
+}
+
+function renderRecords() {
+  const container = document.getElementById('recordsList');
+  if (!container) return;
+
+  // 近7天：整房紀錄
+  const cleanEntries = Object.entries(state.recentCleanRecords).map(([id, r]) => ({...r, _id:id, _type:'clean'}));
+
+  // 查房紀錄：依日期選擇器的業務日過濾
+  const selDate = document.getElementById('recDatePicker')?.value || getBusinessDate();
+  const inspEntries = Object.values(state.inspections).filter(r => {
+    const ts = r.time || r.startTime;
+    return ts && getBusinessDate(ts) === selDate;
+  }).map(r => ({...r, _type:'insp'}));
+
+  let combined = [...cleanEntries, ...inspEntries];
+
+  // 篩選
+  combined = combined.filter(r => {
+    if (state.recFilter === 'clean') return r._type === 'clean';
+    if (state.recFilter === 'insp')  return r._type === 'insp';
+    return true;
+  });
+
+  if (!combined.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div>${selDate} 尚無紀錄</div></div>`;
+    return;
+  }
+
+  // 按日期分組（降冪）
+  const groups = {};
+  combined.forEach(r => {
+    const ts = r.startTime || r.time;
+    const dateKey = ts ? localDateStr(new Date(ts)) : (r._date || '未知');
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(r);
+  });
+
+  const sortedDates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+  container.innerHTML = sortedDates.map(date => {
+    const recs = groups[date].sort((a,b) => ((b.startTime||b.time||0)-(a.startTime||a.time||0)));
+    const today = localDateStr(new Date());
+    const yesterday = localDateStr(new Date(Date.now()-86400000));
+    const label = date === today ? '今天 '+date : date === yesterday ? '昨天 '+date : date;
+    return `<div style="padding:8px 14px 4px;font-size:12px;font-weight:600;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);">${label}</div>`
+      + recs.map(rec => {
+        if (rec._type === 'clean') return renderCleanRecord(rec);
+        if (rec._type === 'insp')  return renderInspRecord(rec);
+        return '';
+      }).join('');
+  }).join('');
+}
+
+function renderCleanRecord(rec) {
+  const recId = rec._id;
+  const typeInfo = CLEANING_TYPES[rec.type] || {};
+  const isComplete = !!rec.endTime;
+  const areaHtml = Object.entries(AREAS).map(([akey, alabel]) => {
+    const people = (rec.assignees && rec.assignees[akey]) || [];
+    const names = people.map(sid => state.staff[sid]?.name||'').filter(Boolean);
+    return names.length ? `<div class="area-tag">${alabel[state.lang]}: ${names.join('、')}</div>` : '';
+  }).join('');
+
+  return `<div class="record-card">
+    <div class="record-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:16px;">🧹</span>
+          <div class="record-room">🏠 ${rec.room}</div>
+        </div>
+        <div class="record-times">
+          ${t('startTime')}: ${formatTime(rec.startTime)}
+          ${isComplete ? ` ｜ ${t('endTime')}: ${formatTime(rec.endTime)} (${formatDuration(rec.startTime,rec.endTime)})` : ` ｜ <span style="color:var(--warning)">⏳ 整理中</span>`}
+        </div>
+      </div>
+      <span class="badge ${typeInfo.cls||''}">${ct(rec.type)}</span>
+    </div>
+    <div class="record-areas">${areaHtml}</div>
+    ${state.isAdmin ? `<div style="margin-top:8px;display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn btn-sm btn-outline" onclick="openEditRecord('${recId}')">✏️ 修改</button>
+      <button class="btn btn-sm btn-danger" style="opacity:.7;" onclick="adminDeleteRecord('${recId}')">🗑 刪除</button>
+    </div>` : ''}
+  </div>`;
+}
+
+function renderInspRecord(rec) {
+  const allItems = INSPECTION_CATEGORIES.flatMap(c => c.items);
+  const defects = allItems.filter(i => rec.items?.[i.id]?.status === 'defect');
+  return `<div class="record-card" style="border-left:4px solid var(--primary);">
+    <div class="record-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:16px;">🔍</span>
+          <div class="record-room">🏠 ${rec.room}</div>
+        </div>
+        <div class="record-times">查房：${formatTime(rec.time)} ｜ ${rec.inspector||''}</div>
+      </div>
+      <span class="badge badge-normal">${rec.setCount||0}/${rec.totalItems||0}</span>
+    </div>
+    ${defects.length ? `<div style="font-size:12px;color:var(--danger);margin-top:6px;">⚠️ 缺失：${defects.map(i=>i.name).join('、')}</div>` : `<div style="font-size:12px;color:var(--success);margin-top:4px;">✓ 全數正常</div>`}
+  </div>`;
+}
+
+// ════════════════════════════════
+//  ISSUE TRANSLATION
+// ════════════════════════════════
+async function translateIssueDesc() {
+  const el = document.getElementById('issueDesc');
+  const text = el.value.trim();
+  if (!text) { showToast('請先輸入問題描述'); return; }
+  showToast('🔄 翻譯中...');
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=vi|zh-CN&de=hmotel.jt@gmail.com`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.responseStatus === 200 && data.responseData.translatedText) {
+      el.value = data.responseData.translatedText;
+      showToast('✅ 翻譯完成');
+    } else {
+      showToast('❌ 翻譯失敗，請手動輸入');
+    }
+  } catch(e) {
+    showToast('❌ 無法連線翻譯服務');
+  }
+}
+
+// ════════════════════════════════
+//  INSPECTION PERIOD
+// ════════════════════════════════
+function openInspPeriodModal() {
+  const p = state.inspPeriod;
+  if (p) {
+    document.getElementById('inspPeriodStart').value = p.start || '';
+    document.getElementById('inspPeriodEnd').value   = p.end   || '';
+    document.getElementById('inspPeriodLabel').value  = p.label || '';
+    document.getElementById('currentPeriodInfo').textContent = `目前週期：${p.start} ～ ${p.end}`;
+  } else {
+    // Default: today to 7 days later
+    const today = new Date().toISOString().split('T')[0];
+    const d7 = new Date(Date.now() + 7*86400000).toISOString().split('T')[0];
+    document.getElementById('inspPeriodStart').value = today;
+    document.getElementById('inspPeriodEnd').value   = d7;
+    document.getElementById('inspPeriodLabel').value  = '';
+    document.getElementById('currentPeriodInfo').textContent = '尚未設定週期';
+  }
+  showModal('modalInspPeriod');
+}
+
+function saveInspPeriod() {
+  const start = document.getElementById('inspPeriodStart').value;
+  const end   = document.getElementById('inspPeriodEnd').value;
+  const label = document.getElementById('inspPeriodLabel').value.trim();
+  if (!start || !end) { showToast('請選擇開始與結束日期'); return; }
+  if (start > end) { showToast('結束日期需晚於開始日期'); return; }
+  state.inspPeriod = { start, end, label };
+  db.ref(DB_ROOT+'/config/inspPeriod').set(state.inspPeriod);
+  closeModal('modalInspPeriod');
+  showToast(`✅ 查房週期已設定：${start} ～ ${end}`);
+  updatePeriodBanner();
+  renderInspectOverview();
+  renderPeriodRecords();
+}
+
+function resetInspPeriod() {
+  state.inspPeriod = null;
+  db.ref(DB_ROOT+'/config/inspPeriod').remove();
+  document.getElementById('currentPeriodInfo').textContent = '已重置';
+  closeModal('modalInspPeriod');
+  showToast('🔄 查房畫面已重置（顯示10天）');
+  updatePeriodBanner();
+  renderInspectOverview();
+  renderPeriodRecords();
+}
+
+function updatePeriodBanner() {
+  const el = document.getElementById('periodInfoBanner');
+  if (!el) return;
+  if (state.inspPeriod) {
+    el.textContent = `📅 查房週期：${state.inspPeriod.start} ～ ${state.inspPeriod.end}${state.inspPeriod.label ? ' (' + state.inspPeriod.label + ')' : ''}`;
+  } else {
+    el.textContent = '（顯示最近10天，可設定查房週期）';
+  }
+}
+
+function renderPeriodRecords() {
+  const container = document.getElementById('periodRecordsList');
+  if (!container) return;
+  const now = Date.now();
+  const cutoff = state.inspPeriod && state.inspPeriod.start
+    ? new Date(state.inspPeriod.start + 'T08:00:00').getTime()
+    : now - 10*86400000;
+  const endCut = state.inspPeriod && state.inspPeriod.end
+    ? new Date(state.inspPeriod.end + 'T23:59:59').getTime()
+    : now;
+
+  const recs = Object.entries(state.inspections)
+    .filter(([,r]) => r.time >= cutoff && r.time <= endCut)
+    .sort((a,b) => (b[1].time||0)-(a[1].time||0));
+
+  if (!recs.length) {
+    container.innerHTML = `<div style="font-size:13px;color:var(--text3);padding:8px 0;">本週期尚無查房紀錄</div>`;
+    return;
+  }
+  const titlePeriod = state.inspPeriod ? `${state.inspPeriod.start} ～ ${state.inspPeriod.end}` : '最近10天';
+  container.innerHTML = `
+    <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;">本階段查房紀錄（${titlePeriod}）</div>
+    ${recs.map(([rid, rec]) => {
+      const defCnt = INSPECTION_CATEGORIES.flatMap(c=>c.items).filter(i=>rec.items?.[i.id]?.status==='defect').length;
+      return `<div class="inspect-card" style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:15px;font-weight:700;color:var(--primary);">🏠 ${rec.room}</div>
+          ${defCnt > 0 ? `<span style="font-size:11px;color:var(--danger);">⚠️ ${defCnt}缺失</span>` : `<span style="font-size:11px;color:var(--success);">✓ 正常</span>`}
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${formatDate(rec.time)} ${formatTime(rec.time)} ｜ ${rec.inspector||''}</div>
+        ${state.isAdmin ? `<button class="btn btn-sm btn-danger" style="opacity:.7;margin-top:6px;" onclick="adminDeleteInspection('${rid}')">🗑</button>` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+// Load period from Firebase on init
+function loadInspPeriod() {
+  db.ref(DB_ROOT+'/config/inspPeriod').once('value', snap => {
+    const p = snap.val();
+    if (p) {
+      state.inspPeriod = p;
+      updatePeriodBanner();
+    }
+  });
+}
+
+// ════════════════════════════════
+//  WEEK / MONTH PERIOD HELPERS
+// ════════════════════════════════
+function getWeekPeriod() {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun
+  const daysFromMon = dow === 0 ? 6 : dow - 1;
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - daysFromMon);
+  weekStart.setHours(8,0,0,0);
+  if (dow === 1 && now.getHours() < 8) weekStart.setDate(weekStart.getDate() - 7);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return { start: weekStart, end: weekEnd };
+}
+
+function getMonthPeriod() {
+  const now = new Date();
+  const mStart = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
+  if (now.getDate() === 1 && now.getHours() < 8) mStart.setMonth(mStart.getMonth()-1);
+  const mEnd = new Date(mStart.getFullYear(), mStart.getMonth()+1, 1, 8, 0, 0);
+  return { start: mStart, end: mEnd };
+}
+
+function dateStr(d) {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const dy = String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${dy}`;
+}
+function periodLabel(s, e) { return `${dateStr(s).slice(5)}~${dateStr(e).slice(5).slice(0,5)}`; }
+
+// ════════════════════════════════
+//  REPORTS TAB
+// ════════════════════════════════
+function renderReports() {
+  const container = document.getElementById('reportsContent');
+  if (!container) return;
+  const today = localDateStr(new Date());
+  const wp = getWeekPeriod();
+  const mp = getMonthPeriod();
+  const thisMonday = localDateStr(wp.start);
+  const thisMonth  = `${mp.start.getFullYear()}-${String(mp.start.getMonth()+1).padStart(2,'0')}`;
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">📅 每日報表</div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>選擇業務日期</label>
+        <input type="date" id="rptDailyDate" value="${today}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-outline btn-sm w-full" onclick="exportDailyCleanLog()">🧹 整房流水表（可印出）</button>
+        <button class="btn btn-outline btn-sm w-full" onclick="exportDailyStaffCount()">👥 員工整房間數</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">🔍 查房報表</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>查房期間起</label>
+        <input type="date" id="rptInspStart" value="${state.inspPeriod?.start || thisMonday}">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>查房期間迄</label>
+        <input type="date" id="rptInspEnd" value="${state.inspPeriod?.end || today}">
+      </div>
+      <button class="btn btn-outline btn-sm w-full" onclick="exportPeriodInspection()">🔍 期間查房流水表</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">📊 週報</div>
+      <div class="form-group" style="margin-bottom:6px;">
+        <label>選擇週報起始日（週一）</label>
+        <input type="date" id="rptWeekDate" value="${thisMonday}" onchange="updateWeekLabel()">
+      </div>
+      <div id="rptWeekLabel" style="font-size:11px;color:var(--primary);margin-bottom:10px;padding:4px 0;"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-outline btn-sm w-full" onclick="exportWeeklyIssues()">⚠️ 問題紀錄表（可印出）</button>
+        <button class="btn btn-primary btn-sm w-full" onclick="exportWeeklyReport()">📊 周報 Excel（3張）</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">📅 月報</div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>選擇月份</label>
+        <input type="month" id="rptMonthRef" value="${thisMonth}">
+      </div>
+      <button class="btn btn-primary btn-sm w-full" onclick="exportMonthlyReport()">📊 月報 Excel（3張）</button>
+    </div>
+  `;
+  setTimeout(updateWeekLabel, 50);
+}
+
+function updateWeekLabel() {
+  const el = document.getElementById('rptWeekLabel');
+  if (!el) return;
+  const wr = getWeekRangeFromInput();
+  const endDay = new Date(wr.end.getTime() - 1000);
+  el.textContent = `週期：${dateStr(wr.start)} 08:00 ～ ${dateStr(endDay)} 07:59`;
+}
+
+function getWeekRangeFromInput() {
+  const val = document.getElementById('rptWeekDate')?.value || localDateStr(getWeekPeriod().start);
+  const start = new Date(val + 'T08:00:00');
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  end.setHours(7, 59, 59, 999);
+  return { start, end };
+}
+
+function getMonthRangeFromInput() {
+  const val = document.getElementById('rptMonthRef')?.value || localDateStr(getMonthPeriod().start).slice(0,7);
+  const [y, m] = val.split('-').map(Number);
+  const start = new Date(y, m-1, 1, 0, 0, 0);
+  const end   = new Date(y, m,   1, 0, 0, 0);
+  return { start, end, prefix: val };
+}
+
+// ════════════════════════════════
+//  EXCEL EXPORTS
+// ════════════════════════════════
+function applyPrintStyle(ws, printTitle, cols) {
+  ws['!cols'] = cols.map(w => ({wch:w}));
+  ws['!pageSetup'] = { paperSize:9, orientation:'portrait', fitToWidth:1, fitToHeight:0, scale:90 };
+  ws['!margins'] = { left:1.8/2.54, right:1.8/2.54, top:2.54/2.54, bottom:2.54/2.54, header:0.5/2.54, footer:0.5/2.54 };
+  ws['!printHeader'] = true;
+  return ws;
+}
+
+function loadDateRecords(dateStr, cb) {
+  db.ref(DB_ROOT+'/cleaning/' + dateStr).once('value', snap => cb(snap.val() || {}));
+}
+
+// ① 每日整房流水表
+function exportDailyCleanLog() {
+  const bDate = document.getElementById('rptDailyDate')?.value || localDateStr(new Date());
+  showToast('載入中...');
+  db.ref(DB_ROOT+'/cleaning/' + bDate).once('value', snap => {
+    const records = Object.values(snap.val() || {}).sort((a,b)=>(a.startTime||0)-(b.startTime||0));
+    (function doExport() {
+  const wb = XLSX.utils.book_new();
+  const title = [`整房紀錄表　${bDate}`];
+  const headers = ['房號','開始時間','結束時間','整理類型','用時(分)','房間','中間','廁所','樓梯','車庫'];
+  const rows = records.map(rec => {
+    const g = k => ((rec.assignees&&rec.assignees[k])||[]).map(s=>state.staff[s]?.name||'').filter(Boolean).join('、');
+    return [
+      rec.room,
+      formatTime(rec.startTime),
+      rec.endTime ? formatTime(rec.endTime) : '整理中',
+      CLEANING_TYPES[rec.type]?.zh || rec.type,
+      rec.endTime ? Math.round((rec.endTime-rec.startTime)/60000) : '',
+      g('room'), g('middle'), g('bathroom'), g('stair'), g('garage')
+    ];
+  });
+  // Add signature row
+  const sigRow = ['','','','','','主管簽名：','___________________','','',''];
+  const ws = XLSX.utils.aoa_to_sheet([title, headers, ...rows, [], sigRow]);
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:9}}, // title merge
+    {s:{r:rows.length+3,c:5}, e:{r:rows.length+3,c:9}} // sig merge
+  ];
+  applyPrintStyle(ws, title[0], [6,8,8,10,6,10,10,10,10,10]);
+  XLSX.utils.book_append_sheet(wb, ws, `整房_${bDate}`);
+  XLSX.writeFile(wb, `整房流水_${bDate}.xlsx`);
+  showToast('✅ 整房流水表已下載');
+    })();
+  });
+}
+
+// ② 每日員工整房間數（含本月累積）
+async function exportDailyStaffCount() {
+  const bDate = document.getElementById('rptDailyDate')?.value || localDateStr(new Date());
+  const prefix = bDate.slice(0,7);
+  showToast('載入月資料中...');
+
+  db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(prefix).endAt(prefix+'\uf8ff').once('value', async snap => {
+    const allData = snap.val() || {};
+    // Monthly stats
+    const monthlyStats = {};
+    Object.values(allData).forEach(dayRecs => {
+      Object.values(dayRecs).forEach(rec => {
+        if (!rec.endTime) return;
+        const credits = getStaffCredits(rec);
+        const cat = getTypeCategory(rec.type);
+        Object.entries(credits).forEach(([sid, cr]) => {
+          if (!monthlyStats[sid]) monthlyStats[sid] = {clean:0,maintain:0,stair:0,garage:0};
+          monthlyStats[sid][cat] = Math.round((monthlyStats[sid][cat]+cr)*100)/100;
+        });
+      });
+    });
+    // Daily stats from Firebase for selected date
+    const dayData = allData[bDate] || {};
+    const dailyStats = aggregateStats(Object.values(dayData));
+    const wb = XLSX.utils.book_new();
+    const headers = ['姓名','職位','整房','保養','樓梯保養','車庫保養','當日合計','本月整房累積','本月保養累積','本月合計'];
+    const staffList = Object.keys({...dailyStats,...monthlyStats});
+    const rows = staffList.map(sid => {
+      const s = state.staff[sid]; if (!s) return null;
+      const d = dailyStats[sid] || {clean:0,maintain:0,stair:0,garage:0};
+      const m = monthlyStats[sid] || {clean:0,maintain:0,stair:0,garage:0};
+      const dTotal = Math.round((d.clean+d.maintain+d.stair+d.garage)*100)/100;
+      const mTotal = Math.round((m.clean+m.maintain+m.stair+m.garage)*100)/100;
+      return [s.name, ROLE_LABELS[s.role]?.zh||'', d.clean, d.maintain, d.stair, d.garage, dTotal, m.clean, m.maintain, mTotal];
+    }).filter(Boolean);
+    const ws = XLSX.utils.aoa_to_sheet([[`員工整房間數　${bDate}`], headers, ...rows]);
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:9}}];
+    applyPrintStyle(ws, '', [10,8,6,6,8,8,8,10,10,8]);
+    XLSX.utils.book_append_sheet(wb, ws, `間數_${bDate}`);
+    XLSX.writeFile(wb, `員工間數_${bDate}.xlsx`);
+    showToast('✅ 員工間數已下載');
+  });
+}
+
+// ③ 期間查房流水表
+function exportPeriodInspection() {
+  const startStr = document.getElementById('rptInspStart').value;
+  const endStr   = document.getElementById('rptInspEnd').value;
+  if (!startStr || !endStr) { showToast('請選擇期間'); return; }
+  const startTs = new Date(startStr+'T08:00:00').getTime();
+  const endTs   = new Date(endStr+'T23:59:59').getTime();
+  const period  = `${startStr}～${endStr}`;
+
+  const allItems = INSPECTION_CATEGORIES.flatMap(c=>c.items);
+  const recs = Object.values(state.inspections)
+    .filter(r => r.time >= startTs && r.time <= endTs)
+    .sort((a,b) => (a.time||0)-(b.time||0));
+
+  if (!recs.length) { showToast('此期間無查房紀錄'); return; }
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: 查房流水
+  const h1 = ['房號','查房日期','查房時間','查房人員','整房人員','整房類型','缺失數','缺失項目','缺失原因'];
+  const rows1 = recs.map(rec => {
+    const defs = allItems.filter(i => rec.items?.[i.id]?.status==='defect');
+    return [
+      rec.room, rec.date||'',
+      rec.time ? new Date(rec.time).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) : '',
+      rec.inspector||'', rec.cleaningStaff||'',
+      rec.cleaningType ? CLEANING_TYPES[rec.cleaningType]?.zh||rec.cleaningType : '',
+      defs.length,
+      defs.map(i=>i.name).join('、'),
+      defs.map(i=>`${i.name}: ${rec.items[i.id].reason||''}`).join('；')
+    ];
+  });
+  const titleRow = [`查房紀錄表　${period}`];
+  const ws1 = XLSX.utils.aoa_to_sheet([titleRow, h1, ...rows1]);
+  ws1['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:8}}];
+  applyPrintStyle(ws1, '', [6,10,8,10,12,10,6,30,35]);
+  XLSX.utils.book_append_sheet(wb, ws1, `查房_${period.replace('～','-')}`);
+
+  // One sheet per room
+  const roomGroups = {};
+  recs.forEach(rec => { if (!roomGroups[rec.room]) roomGroups[rec.room]=[];  roomGroups[rec.room].push(rec); });
+  Object.entries(roomGroups).forEach(([room, roomRecs]) => {
+    const detRows = [];
+    INSPECTION_CATEGORIES.forEach(cat => {
+      cat.items.forEach(item => {
+        roomRecs.forEach(rec => {
+          const s = rec.items?.[item.id];
+          if (!s||!s.status) return;
+          detRows.push([
+            rec.date||'', new Date(rec.time||0).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),
+            rec.inspector||'', rec.cleaningStaff||'', rec.cleaningType ? CLEANING_TYPES[rec.cleaningType]?.zh||'':'',
+            cat.label, item.name, item.qty||'',
+            s.status==='ok'?'✓ OK': s.status==='defect'?'⚠ 缺失':'N/A',
+            s.reason||''
+          ]);
+        });
+      });
+    });
+    if (!detRows.length) return;
+    const wsDet = XLSX.utils.aoa_to_sheet([
+      [`${room} 查房明細　${period}`],
+      ['日期','時間','查房人','整房人員','整房類型','類別','檢查項目','數量','狀態','缺失原因'],
+      ...detRows
+    ]);
+    wsDet['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:9}}];
+    applyPrintStyle(wsDet, '', [10,8,10,12,8,8,20,6,10,25]);
+    XLSX.utils.book_append_sheet(wb, wsDet, room);
+  });
+
+  XLSX.writeFile(wb, `查房紀錄_${period.replace('～','-')}.xlsx`);
+  showToast('✅ 查房流水表已下載');
+}
+
+// ④ 每周問題紀錄
+function exportWeeklyIssues() {
+  const wr = getWeekRangeFromInput();
+  const startTs = wr.start.getTime();
+  const endTs   = wr.end.getTime();
+  const period  = `${dateStr(wr.start)}～${dateStr(new Date(wr.end.getTime()-86400000))}`;
+
+  const issues = Object.values(state.issues)
+    .filter(iss => iss.createdAt >= startTs && iss.createdAt <= endTs)
+    .sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+
+  const wb = XLSX.utils.book_new();
+  const titleRow = [`問題紀錄表　${period}`];
+  const headers = ['房號','回報時間','回報人員','問題描述','嚴重程度','處理狀態','解決人員','解決時間','備註'];
+  const sevMap = {low:'輕微', mid:'中等', high:'嚴重'};
+
+  const dataRows = issues.map(iss => {
+    const isOld = iss.status==='pending' && (iss.createdAt||0) < (startTs - 7*86400000);
+    return [
+      (isOld?'★ ':'')+iss.room,
+      `${formatDate(iss.createdAt)} ${formatTime(iss.createdAt)}`,
+      iss.reportedBy||'',
+      iss.desc||'',
+      sevMap[iss.severity]||iss.severity||'',
+      iss.status==='resolved'?'已解決':'待處理',
+      iss.resolvedBy||'',
+      iss.resolvedAt ? `${formatDate(iss.resolvedAt)} ${formatTime(iss.resolvedAt)}` : '',
+      ''  // blank for handwriting
+    ];
+  });
+  // Add blank rows for handwriting
+  for (let i=0; i<5; i++) dataRows.push(['','','','','','','','','']);
+
+  const sigRow = ['','','','','','主管簽名：','___________________','',''];
+  const ws = XLSX.utils.aoa_to_sheet([titleRow, headers, ...dataRows, [], sigRow]);
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:8}},
+    {s:{r:dataRows.length+3,c:5}, e:{r:dataRows.length+3,c:8}}
+  ];
+  applyPrintStyle(ws, '', [8,14,10,25,6,8,10,14,12]);
+  XLSX.utils.book_append_sheet(wb, ws, `問題_${period.replace('～','-')}`);
+  XLSX.writeFile(wb, `問題紀錄_${period.replace('～','-')}.xlsx`);
+  showToast('✅ 問題紀錄已下載（★為超過7天未解決）');
+}
+
+// ⑤ 每周周報（整房統計＋特殊保養＋問題紀錄）
+function exportWeeklyReport() {
+  const wr = getWeekRangeFromInput();
+  const startTs = wr.start.getTime();
+  const endTs   = wr.end.getTime();
+  const period  = `${dateStr(wr.start)}～${dateStr(new Date(endTs-86400000))}`;
+  showToast('載入週資料...');
+
+  db.ref(DB_ROOT+'/cleaning').orderByKey()
+    .startAt(dateStr(wr.start)).endAt(dateStr(new Date(endTs-86400000))+'\uf8ff')
+    .once('value', snap => {
+    const allData = snap.val() || {};
+    const allRecs = [];
+    Object.values(allData).forEach(d => Object.values(d).forEach(r => allRecs.push(r)));
+    const doneRecs = allRecs.filter(r => r.endTime);
+    const stats = aggregateStats(doneRecs);
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: 人員整房統計
+    const sumHeaders = ['姓名','職位','正常整','大保養','樓梯保養','車庫保養','本週合計'];
+    const sumRows = Object.entries(stats).map(([sid,s]) => {
+      const st = state.staff[sid]; if(!st) return null;
+      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+    }).filter(Boolean);
+    if (sumRows.length) {
+      const tot = sumRows.reduce((acc,r)=>{ [2,3,4,5,6].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc;}, ['合計','','','','','','']);
+      [2,3,4,5,6].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
+      sumRows.push(tot);
+    }
+    const wsSum = XLSX.utils.aoa_to_sheet([[`本週整房統計　${period}`], sumHeaders, ...sumRows]);
+    wsSum['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:6}}];
+    applyPrintStyle(wsSum, '', [10,8,6,6,8,8,8]);
+    XLSX.utils.book_append_sheet(wb, wsSum, '人員統計');
+
+    // Sheet 2: 特殊保養紀錄
+    const specRecs = doneRecs.filter(r => ['deep','stair','garage'].includes(r.type))
+                             .sort((a,b)=>(a.startTime||0)-(b.startTime||0));
+    const specHeaders = ['房號','日期','整理類型','開始時間','結束時間','人員'];
+    const specRows = specRecs.map(rec => {
+      const people = Object.values(rec.assignees||{}).flat().map(sid=>state.staff[sid]?.name||'').filter(Boolean);
+      return [rec.room, rec.startTime?localDateStr(new Date(rec.startTime)):'',
+        CLEANING_TYPES[rec.type]?.zh||rec.type, formatTime(rec.startTime), formatTime(rec.endTime),
+        [...new Set(people)].join('、')];
+    });
+    const wsSpec = XLSX.utils.aoa_to_sheet([[`特殊保養紀錄　${period}`], specHeaders, ...specRows]);
+    wsSpec['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:5}}];
+    applyPrintStyle(wsSpec, '', [6,10,10,8,8,20]);
+    XLSX.utils.book_append_sheet(wb, wsSpec, '特殊保養');
+
+    // Sheet 3: 問題紀錄
+    const issInWeek = Object.values(state.issues)
+      .filter(iss => iss.createdAt >= startTs && iss.createdAt <= endTs)
+      .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+    const issHeaders = ['房號','回報時間','回報人','問題描述','嚴重','狀態','解決人','解決時間'];
+    const sevMap = {low:'輕微',mid:'中等',high:'嚴重'};
+    const issRows = issInWeek.map(iss=>[
+      iss.room, iss.createdAt?`${localDateStr(new Date(iss.createdAt))} ${formatTime(iss.createdAt)}`:'',
+      iss.reportedBy||'', iss.desc||'', sevMap[iss.severity]||'',
+      iss.status==='resolved'?'已解決':'待處理', iss.resolvedBy||'',
+      iss.resolvedAt?`${localDateStr(new Date(iss.resolvedAt))} ${formatTime(iss.resolvedAt)}`:''
+    ]);
+    const wsIss = XLSX.utils.aoa_to_sheet([[`本週問題紀錄　${period}`], issHeaders, ...issRows]);
+    wsIss['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:7}}];
+    applyPrintStyle(wsIss, '', [6,14,8,28,6,8,8,14]);
+    XLSX.utils.book_append_sheet(wb, wsIss, '問題紀錄');
+
+    XLSX.writeFile(wb, `周報_${period.replace('～','-')}.xlsx`);
+    showToast('✅ 周報已下載（3張工作表）');
+  });
+}
+
+// ⑥ 月報（整房統計＋問題紀錄＋特殊保養）
+function exportMonthlyReport() {
+  const mr = getMonthRangeFromInput();
+  const prefix = mr.prefix;
+  const startTs = mr.start.getTime();
+  const endTs   = mr.end.getTime();
+  showToast('載入月資料...');
+
+  db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(prefix).endAt(prefix+'').once('value', snap => {
+    const allData = snap.val() || {};
+    const allRecs = [];
+    Object.values(allData).forEach(d => Object.values(d).forEach(r => allRecs.push(r)));
+    const doneRecs = allRecs.filter(r => r.endTime);
+    const stats = aggregateStats(doneRecs);
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: 人員整房統計
+    const moHeaders = ['姓名','職位','正常整','大保養','樓梯保養','車庫保養','本月合計'];
+    const moRows = Object.entries(stats).map(([sid,s]) => {
+      const st = state.staff[sid]; if(!st) return null;
+      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+    }).filter(Boolean);
+    if (moRows.length) {
+      const tot = moRows.reduce((acc,r)=>{ [2,3,4,5,6].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc; }, ['合計','','','','','','']);
+      [2,3,4,5,6].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
+      moRows.push(tot);
+    }
+    const wsMo = XLSX.utils.aoa_to_sheet([[`${prefix} 月份整房統計`], moHeaders, ...moRows]);
+    wsMo['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:6}}];
+    applyPrintStyle(wsMo, '', [10,8,6,6,8,8,8]);
+    XLSX.utils.book_append_sheet(wb, wsMo, '人員統計');
+
+    // Sheet 2: 特殊保養紀錄
+    const specTypes = ['deep','stair','garage'];
+    const specRecs = doneRecs.filter(r => specTypes.includes(r.type))
+                             .sort((a,b)=>(a.startTime||0)-(b.startTime||0));
+    const specHeaders = ['房號','日期','整理類型','開始時間','結束時間','人員'];
+    const specRows = specRecs.map(rec => {
+      const allStaff = Object.values(rec.assignees||{}).flat()
+        .map(sid=>state.staff[sid]?.name||'').filter(Boolean);
+      return [
+        rec.room,
+        rec.startTime ? localDateStr(new Date(rec.startTime)) : '',
+        CLEANING_TYPES[rec.type]?.zh || rec.type,
+        formatTime(rec.startTime), formatTime(rec.endTime),
+        [...new Set(allStaff)].join('、')
+      ];
+    });
+    const wsSpec = XLSX.utils.aoa_to_sheet([[`${prefix} 特殊保養紀錄`], specHeaders, ...specRows]);
+    wsSpec['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:5}}];
+    applyPrintStyle(wsSpec, '', [6,10,10,8,8,20]);
+    XLSX.utils.book_append_sheet(wb, wsSpec, '特殊保養');
+
+    // Sheet 3: 問題紀錄
+    const issuesInMonth = Object.values(state.issues)
+      .filter(iss => iss.createdAt >= startTs && iss.createdAt < endTs)
+      .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+    const issHeaders = ['房號','回報時間','回報人','問題描述','嚴重','狀態','解決人','解決時間'];
+    const sevMap = {low:'輕微',mid:'中等',high:'嚴重'};
+    const issRows = issuesInMonth.map(iss=>[
+      iss.room,
+      iss.createdAt ? `${localDateStr(new Date(iss.createdAt))} ${formatTime(iss.createdAt)}` : '',
+      iss.reportedBy||'', iss.desc||'',
+      sevMap[iss.severity]||'',
+      iss.status==='resolved'?'已解決':'待處理',
+      iss.resolvedBy||'',
+      iss.resolvedAt ? `${localDateStr(new Date(iss.resolvedAt))} ${formatTime(iss.resolvedAt)}` : ''
+    ]);
+    const wsIss = XLSX.utils.aoa_to_sheet([[`${prefix} 問題紀錄`], issHeaders, ...issRows]);
+    wsIss['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:7}}];
+    applyPrintStyle(wsIss, '', [6,14,8,28,6,8,8,14]);
+    XLSX.utils.book_append_sheet(wb, wsIss, '問題紀錄');
+
+    XLSX.writeFile(wb, `月報_${prefix}.xlsx`);
+    showToast('✅ 月報已下載（3張工作表）');
+  });
+}
+
+// ════════════════════════════════
+//  STARTUP
+// ════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  applyTranslations();
+  init();
+  loadInspPeriod();
+});
+</script>
+</body>
+</html>
