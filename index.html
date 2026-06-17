@@ -6,6 +6,7 @@
 <title>HMOTEL璽悅一館房務系統</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- Storage not required: photos stored as base64 in Realtime Database -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -3201,10 +3202,21 @@ function exportMonthlyReport() {
 // ════════════════════════════════
 //  STARTUP
 // ════════════════════════════════
-window.addEventListener('DOMContentLoaded', () => {
-  applyTranslations();
+function _startApp(){
+  if (window.__started) return;
+  window.__started = true;
   init();
   loadInspPeriod();
+}
+window.addEventListener('DOMContentLoaded', () => {
+  applyTranslations();
+  try {
+    if (firebase.auth) {
+      firebase.auth().onAuthStateChanged(u => { if (u) _startApp(); });
+      firebase.auth().signInAnonymously().catch(e => console.warn('匿名登入:', e && e.code));
+    }
+  } catch(e) { console.warn('auth 不可用:', e); }
+  setTimeout(_startApp, 2500);
 });
 </script>
 </body>
