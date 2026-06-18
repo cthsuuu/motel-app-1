@@ -63,6 +63,9 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
 .badge-rush{background:#6a1a1a;color:#f77a4f;}
 .badge-stair{background:#1a5a3a;color:#4ff78e;}
 .badge-garage{background:#5a4a1a;color:#f7c24f;}
+.badge-stay{background:#1a4a5a;color:#4fd0f7;}
+.badge-small{background:#4a3a1a;color:#f7a24f;}
+.badge-refill{background:#5a1a4a;color:#f74fc2;}
 
 /* ── SCROLLABLE CONTAINER ── */
 .scroll-view{overflow-y:auto;-webkit-overflow-scrolling:touch;}
@@ -276,6 +279,7 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
         <button class="floor-btn" data-floor="2區" onclick="setFloor('2區')">2區(1F)</button>
         <button class="floor-btn" data-floor="3區" onclick="setFloor('3區')">3區(1F)</button>
         <button class="floor-btn" data-floor="5F"  onclick="setFloor('5F')">5F商務</button>
+        <button class="floor-btn" data-floor="其他" onclick="setFloor('其他')" id="lbl-floorOther">其他</button>
         <button class="btn btn-sm btn-outline" style="margin-left:auto;font-size:12px;padding:4px 10px;" onclick="refreshOverview()">🔄 更新今日</button>
       </div>
       <div id="ovDateLabel" style="font-size:11px;color:var(--text2);padding:2px 14px 6px;"></div>
@@ -415,9 +419,10 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
       <label id="lbl-cleanType">整理類型</label>
       <select id="scType">
         <option value="normal">正常整</option>
-        <option value="deep">大保養</option>
         <option value="rush">趕房</option>
-        <option value="stair">樓梯保養</option>
+        <option value="stay">續住整</option>
+        <option value="small">小保養</option>
+        <option value="deep">大保養</option>
         <option value="garage">車庫保養</option>
       </select>
     </div>
@@ -648,17 +653,39 @@ const ROOMS = {
   '1區': ['101','102','103','105','106','107','108','109','110','111'],
   '2區': ['201','202','203','205','206','207','208','209','210'],
   '3區': ['301','302','303','305','306','307','308','309'],
-  '5F':  ['501','502','503','505','506','507']
+  '5F':  ['501','502','503','505','506','507'],
+  '其他': ['公共清潔','主管指派事項','補洗沐']
 };
-// 說明: 1區/2區/3區 均為1F車庫房，5F為商務房/會議室
-const ALL_ROOMS = [...ROOMS['1區'], ...ROOMS['2區'], ...ROOMS['3區'], ...ROOMS['5F']];
+// 說明: 1區/2區/3區 均為1F車庫房，5F為商務房/會議室，其他為公共區域/指派事項
+const GUEST_ROOMS = [...ROOMS['1區'], ...ROOMS['2區'], ...ROOMS['3區'], ...ROOMS['5F']]; // 客房（查房用）
+const ALL_ROOMS = [...GUEST_ROOMS, ...ROOMS['其他']];
+
+// 區域/卡片顯示名稱（含越南文）。一般房號(數字)直接顯示，特殊卡片用此對照。
+const ROOM_LABELS = {
+  '公共清潔':     {zh:'公共清潔',     vi:'Vệ sinh công cộng'},
+  '主管指派事項': {zh:'主管指派事項', vi:'Việc được giao'},
+  '補洗沐':       {zh:'補洗沐',       vi:'Bổ sung dầu gội/sữa tắm'}
+};
+function roomLabel(roomId) {
+  return ROOM_LABELS[roomId] ? ROOM_LABELS[roomId][state.lang] : roomId;
+}
+
+const FLOOR_LABELS = {
+  all:  {zh:'全部', vi:'Tất cả'},
+  '其他': {zh:'其他', vi:'Khác'}
+};
 
 const CLEANING_TYPES = {
   normal: {zh:'正常整', vi:'Dọn thường', cls:'badge-normal'},
-  deep:   {zh:'大保養', vi:'Bảo dưỡng lớn', cls:'badge-deep'},
   rush:   {zh:'趕房',   vi:'Phòng gấp', cls:'badge-rush'},
-  stair:  {zh:'樓梯保養', vi:'Bảo dưỡng cầu thang', cls:'badge-stair'},
-  garage: {zh:'車庫保養', vi:'Bảo dưỡng nhà xe', cls:'badge-garage'}
+  stay:   {zh:'續住整', vi:'Dọn ở tiếp', cls:'badge-stay'},
+  small:  {zh:'小保養', vi:'Bảo dưỡng nhỏ', cls:'badge-small'},
+  deep:   {zh:'大保養', vi:'Bảo dưỡng lớn', cls:'badge-deep'},
+  garage: {zh:'車庫保養', vi:'Bảo dưỡng nhà xe', cls:'badge-garage'},
+  refill: {zh:'補洗沐', vi:'Bổ sung dầu gội/sữa tắm', cls:'badge-refill'},
+  public: {zh:'公共清潔', vi:'Vệ sinh công cộng', cls:'badge-stair'},
+  assign: {zh:'指派事項', vi:'Việc được giao', cls:'badge-normal'},
+  stair:  {zh:'樓梯保養', vi:'Bảo dưỡng cầu thang', cls:'badge-stair'}
 };
 
 const AREAS = {
@@ -669,89 +696,77 @@ const AREAS = {
   garage:   {zh:'車庫', vi:'Nhà xe'}
 };
 
+// 「公共清潔」卡片專用的人員分配區域（含越南文）
+const PUBLIC_AREAS = {
+  pub_toilet: {zh:'一樓公廁',         vi:'Nhà vệ sinh công cộng tầng 1'},
+  hk_toilet:  {zh:'房務室廁所',       vi:'Nhà vệ sinh phòng buồng phòng'},
+  hk_tea:     {zh:'房務室茶水設備',   vi:'Thiết bị trà nước phòng buồng phòng'},
+  reception:  {zh:'一樓接待室',       vi:'Phòng tiếp đón tầng 1'}
+};
+// 依房間回傳對應的區域組（公共清潔用 PUBLIC_AREAS，其餘用 AREAS）
+function areasFor(roomId) {
+  return roomId === '公共清潔' ? PUBLIC_AREAS : AREAS;
+}
+
 const INSPECTION_CATEGORIES = [
-  { cat:'general', label:'一般', items:[
-    {id:'anti_peep', name:'反針孔檢查'},
-    {id:'ac',        name:'冷氣控制(24度/自動)'},
+  { cat:'room_supplies', label:'房間備品檢查區', items:[
+    {id:'r1',  name:'反針孔檢查'},
+    {id:'r2',  name:'房間天花板+樓梯'},
+    {id:'r3',  name:'房間牆壁裝飾背板'},
+    {id:'r4',  name:'電視平面'},
+    {id:'r5',  name:'各沙發椅'},
+    {id:'r6',  name:'各桌面平面'},
+    {id:'r7',  name:'房間/浴室地板'},
+    {id:'r8',  name:'測試電視及音量'},
+    {id:'r9',  name:'VOD測試'},
+    {id:'r10', name:'電話面板時間'},
+    {id:'r11', name:'房間WIFI/冷氣設定25度'},
+    {id:'r12', name:'各抽屜打開檢查'},
+    {id:'r13', name:'冰箱是否正常'},
+    {id:'r14', name:'檢查所有燈飾'},
+    {id:'r15', name:'垃圾桶內垃圾檢查'},
+    {id:'r16', name:'測試KTV/麥克風'},
+    {id:'r17', name:'麥克風套/備用電池',       qty:'各2'},
+    {id:'r18', name:'樓梯口皮拖鞋',           qty:'各2'},
+    {id:'r19', name:'香氛蠟燭/香氛燈',         qty:'各2'},
+    {id:'r20', name:'面紙盒(咖啡色)',          qty:'各1'},
+    {id:'r21', name:'大/小枕頭套',            qty:'各2'},
+    {id:'r22', name:'床單/被套/長型抱枕',       qty:'各1'},
+    {id:'r23', name:'住宿須知/備品價目表',      qty:'各1'},
+    {id:'r24', name:'原子筆',                qty:'各1'},
+    {id:'r25', name:'紅酒牌',                qty:'各1'},
+    {id:'r26', name:'禁菸說明牌',             qty:'各1'},
+    {id:'r27', name:'禁菸/高溫 三角牌(白)',     qty:'各1'},
+    {id:'r28', name:'黑色備品盤/熱水壺',        qty:'各1'},
+    {id:'r29', name:'茶包',                  qty:'各2'},
+    {id:'r30', name:'咖啡/奶茶/調棒*2',        qty:'各1'},
+    {id:'r31', name:'汽水/礦泉水',            qty:'各2'},
+    {id:'r32', name:'馬克杯/杯墊',            qty:'各2'},
+    {id:'r33', name:'小包裝餅干',             qty:'各1'},
+    {id:'r34', name:'泡麵/竹筷',              qty:'各2'},
   ]},
-  { cat:'dresser', label:'梳妝台區', items:[
-    {id:'dresser_mirror', name:'梳妝台鏡面/桌面'},
-    {id:'maint_sign',     name:'維護牌/紅酒牌/禁菸牌【A5】', qty:'1'},
-    {id:'shelf',          name:'層架(價目/須知/搖說/菜單)',   qty:'4'},
-    {id:'remote',         name:'遙控器',                      qty:'1'},
-    {id:'condom',         name:'保險套/潤滑液',                qty:'2/1'},
-    {id:'namecard',       name:'名片/筆'},
-    {id:'mic_box',        name:'麥克風盒/麥克風',              qty:'1/2'},
-    {id:'mic_cover',      name:'麥克風套1包+電池*4顆',         qty:'1/4'},
-    {id:'snacks',         name:'泡麵/筷子/餅乾',              qty:'各2'},
-    {id:'amenity_tray',   name:'黑色備品盤',                  qty:'1'},
-    {id:'kettle',         name:'熱水壺/防燙三角',              qty:'1/1'},
-    {id:'water',          name:'水/馬克杯/杯墊',              qty:'2/2/2'},
-    {id:'drinks',         name:'沖泡飲品/茶包/調棒',           qty:'2/2/2'},
-    {id:'fridge_drinks',  name:'冰箱飲品',                    qty:'2'},
-    {id:'fridge',         name:'冰箱',                        qty:'1'},
-    {id:'trash_room',     name:'垃圾桶',                      qty:'1'},
+  { cat:'bath_supplies', label:'浴室備品檢查區', items:[
+    {id:'b1',  name:'補充洗髮罐/沐浴罐'},
+    {id:'b2',  name:'淋浴間地板及玻璃'},
+    {id:'b3',  name:'浴室鏡面'},
+    {id:'b4',  name:'浴缸/洗手台'},
+    {id:'b5',  name:'浴室垃圾桶檢查'},
+    {id:'b6',  name:'面盆水壓水溫'},
+    {id:'b7',  name:'浴室拖鞋/雙',            qty:'各2'},
+    {id:'b8',  name:'大毛/小毛',              qty:'各2'},
+    {id:'b9',  name:'踏布/踏墊',              qty:'各1'},
+    {id:'b10', name:'吹風機/髮夾',            qty:'各1'},
+    {id:'b11', name:'紙杯/杯墊',              qty:'各2'},
+    {id:'b12', name:'泡湯塊',                qty:'各1'},
+    {id:'b13', name:'保險套*2/潤滑液*1'},
+    {id:'b14', name:'捲筒衛生紙',             qty:'各2'},
+    {id:'b15', name:'馬桶蓋消毒紙',           qty:'各1'},
   ]},
-  { cat:'equipment', label:'設備', items:[
-    {id:'vod_wifi',   name:'VOD/WIFI'},
-    {id:'tv',         name:'電視及整線'},
-    {id:'ktv',        name:'KTV設備測試'},
-    {id:'dehumid',    name:'吊隱式除濕機/落地除濕機'},
-    {id:'mosquito',   name:'電蚊香/防蚊液'},
-  ]},
-  { cat:'sofa', label:'沙發茶几', items:[
-    {id:'window',     name:'窗戶擦拭'},
-    {id:'sofa',       name:'沙發/沙發抱枕'},
-    {id:'tea_table',  name:'茶几'},
-    {id:'no_smoke',   name:'禁菸小三角牌',  qty:'1'},
-    {id:'stool',      name:'小圓凳'},
-  ]},
-  { cat:'bed', label:'床區', items:[
-    {id:'bedside',    name:'床頭櫃擦拭'},
-    {id:'tissue_box', name:'衛生紙盒(咖啡色)', qty:'1'},
-    {id:'eco_sign',   name:'環保立牌',          qty:'1'},
-    {id:'phone',      name:'電話測試/電話卡',   qty:'1'},
-    {id:'hanger',     name:'落地衣架',          qty:'1'},
-    {id:'pillow',     name:'大小枕頭/枕頭套',   qty:'2'},
-    {id:'bedding',    name:'床單/棉被/被套/圓柱枕', qty:'1'},
-    {id:'under_bed',  name:'床底下'},
-  ]},
-  { cat:'wall', label:'牆面/地板', items:[
-    {id:'headboard',  name:'床頭背牆/各式鏡面'},
-    {id:'bath_wall',  name:'廁所牆面/廁所玻璃門'},
-    {id:'switches',   name:'各式開關/檢查燈飾'},
-    {id:'room_floor', name:'房間地板'},
-  ]},
-  { cat:'shower', label:'淋浴間', items:[
-    {id:'shampoo',      name:'洗髮精/沐浴乳'},
-    {id:'shower_head',  name:'淋浴柱/蓮蓬頭'},
-    {id:'shower_wall',  name:'淋浴間牆面、地面(矽利康)'},
-    {id:'corner_pad',   name:'牆角防撞貼'},
-    {id:'shower_door',  name:'淋浴間玻璃門'},
-  ]},
-  { cat:'toilet', label:'廁所', items:[
-    {id:'toilet',       name:'馬桶/馬桶封條',        qty:'1'},
-    {id:'trash_toilet', name:'垃圾桶'},
-    {id:'bath_mirror',  name:'浴室鏡子/洗手台檯面'},
-    {id:'sink',         name:'面盆/面盆龍頭'},
-    {id:'hairdryer',    name:'吹風機/吹風機架'},
-    {id:'paper_cup',    name:'紙杯/杯墊/洗手露'},
-    {id:'towel',        name:'大毛/小毛/踏布'},
-    {id:'toilet_paper', name:'衛生紙(黑色)/捲紙'},
-    {id:'slippers',     name:'浴室拖鞋',             qty:'2'},
-    {id:'bathtub',      name:'浴缸/浴缸出水/冷熱貼'},
-    {id:'bath_tablet',  name:'泡湯塊',               qty:'1'},
-    {id:'toilet_floor', name:'廁所乾區地板/天花板/側牆'},
-  ]},
-  { cat:'stair_garage', label:'樓梯/車庫', items:[
-    {id:'room_door',    name:'房間門/逃生須知/房號牌'},
-    {id:'stair_wall',   name:'樓梯牆面/燈光'},
-    {id:'stair_fire',   name:'樓梯/減火器'},
-    {id:'slippers_stair', name:'皮拖鞋',             qty:'2'},
-    {id:'shoe_chair',   name:'穿鞋椅',               qty:'1'},
-    {id:'garage_table', name:'車庫取餐檯'},
-    {id:'garage_floor', name:'車庫地板/減火器'},
-    {id:'garage_wall',  name:'車庫天花板/牆面'},
+  { cat:'garage_supplies', label:'車庫備品檢查區', items:[
+    {id:'g1',  name:'車庫地板'},
+    {id:'g2',  name:'車庫天花板'},
+    {id:'g3',  name:'餐桌/椅子/穿鞋椅'},
+    {id:'g4',  name:'車庫取餐檯'},
   ]},
 ];
 // Keep legacy for any old references
@@ -859,7 +874,7 @@ const T = {
 
 function t(key) { return T[state.lang][key] || key; }
 function ct(typeKey) { return CLEANING_TYPES[typeKey] ? CLEANING_TYPES[typeKey][state.lang] : typeKey; }
-function at(areaKey) { return AREAS[areaKey] ? AREAS[areaKey][state.lang] : areaKey; }
+function at(areaKey) { const a = AREAS[areaKey] || PUBLIC_AREAS[areaKey]; return a ? a[state.lang] : areaKey; }
 
 // ════════════════════════════════
 //  STATE
@@ -968,7 +983,7 @@ function loadRecordsByDate() {
   db.ref(DB_ROOT+'/cleaning/' + selDate).once('value', snap => {
     const fresh = {};
     const data = snap.val() || {};
-    Object.entries(data).forEach(([id, r]) => { fresh[id] = {...r, _date: selDate}; });
+    Object.entries(data).forEach(([id, r]) => { if (r.type !== 'assign' && r.type !== 'refill') fresh[id] = {...r, _date: selDate}; });
     state.recentCleanRecords = fresh;
     renderRecords();
   });
@@ -1278,13 +1293,14 @@ function applyTranslations() {
   set('nav-overview','navOverview'); set('nav-records','navRecords');
   set('nav-issues','navIssues'); set('nav-inspection','navInspection');
   set('nav-management','navManagement');
+  const fo = document.getElementById('lbl-floorOther'); if(fo) fo.textContent = FLOOR_LABELS['其他'][state.lang];
   set('langBtn', state.lang === 'zh' ? 'langBtn_vi' : 'langBtn_zh');
   document.getElementById('langBtn').textContent = state.lang === 'zh' ? 'VI' : 'ZH';
 
   // Update cleaning type select options
   const scType = document.getElementById('scType');
   if (scType) {
-    scType.innerHTML = Object.entries(CLEANING_TYPES).map(([k,v]) =>
+    scType.innerHTML = Object.entries(CLEANING_TYPES).filter(([k]) => !['public','assign','stair','refill'].includes(k)).map(([k,v]) =>
       `<option value="${k}">${v[state.lang]}</option>`).join('');
   }
 
@@ -1403,7 +1419,7 @@ function renderRoomGrid() {
     return `
       <div class="room-card status-${status}" onclick="openRoomDetail('${roomId}')">
         ${hasIssue ? '<div class="problem-dot"></div>' : ''}
-        <div class="room-no">${roomId}</div>
+        <div class="room-no"${ROOM_LABELS[roomId]?' style="font-size:14px;"':''}>${roomLabel(roomId)}</div>
         <div class="room-type">${typeLabel}</div>
         <div class="room-staff">${staffLabel}</div>
         ${timeLabel ? `<div class="room-time">⏰ ${timeLabel}</div>` : ''}
@@ -1416,6 +1432,11 @@ function renderRoomGrid() {
 //  ROOM DETAIL
 // ════════════════════════════════
 function openRoomDetail(roomId) {
+  // 「主管指派事項」走專屬流程（員工自行填寫）
+  if (roomId === '主管指派事項') { openAssignmentDetail(roomId); return; }
+  // 「補洗沐」走專屬流程（勾選人員＋房號，一人一天算一次）
+  if (roomId === '補洗沐') { openRefillDetail(roomId); return; }
+
   const status = computeRoomStatus(roomId);
 
   // Find active record
@@ -1423,7 +1444,7 @@ function openRoomDetail(roomId) {
   const activeEntry = records.find(([id, r]) => r.room === roomId && !r.endTime);
   const lastEntry = records.filter(([id, r]) => r.room === roomId).sort((a,b) => (b[1].startTime||0)-(a[1].startTime||0))[0];
 
-  document.getElementById('rdRoomNo').textContent = `🏠 ${roomId}`;
+  document.getElementById('rdRoomNo').textContent = `🏠 ${roomLabel(roomId)}`;
   const content = document.getElementById('rdContent');
 
   if (activeEntry) {
@@ -1438,7 +1459,7 @@ function openRoomDetail(roomId) {
         <div style="font-size:13px;color:var(--text2);font-weight:600;">${t('areaAssign')}</div>
         <button class="btn btn-sm btn-outline" onclick="openEditAssignees('${recId}','${roomId}')">✏️ 修改人員</button>
       </div>
-      <div id="areaAssignDisplay_${recId}">${renderAreaAssignView(rec.assignees)}</div>
+      <div id="areaAssignDisplay_${recId}">${renderAreaAssignView(rec.assignees, rec.room)}</div>
       <div class="divider"></div>
       <button class="btn btn-success btn-lg" onclick="completeCleaning('${recId}')">${t('complete')}</button>
       <div style="height:10px;"></div>
@@ -1465,10 +1486,10 @@ function openRoomDetail(roomId) {
   showModal('modalRoomDetail');
 }
 
-function renderAreaAssignView(assignees) {
+function renderAreaAssignView(assignees, roomId) {
   if (!assignees) return '';
   return `<div class="area-assign-grid">
-    ${Object.entries(AREAS).map(([key, label]) => {
+    ${Object.entries(areasFor(roomId)).map(([key, label]) => {
       const people = assignees[key] || [];
       const names = people.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean);
       return `<div class="area-block">
@@ -1480,6 +1501,158 @@ function renderAreaAssignView(assignees) {
 }
 
 // ════════════════════════════════
+//  主管指派事項（員工自行填寫）
+// ════════════════════════════════
+function escAssign(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function openAssignmentDetail(roomId) {
+  const isVi = state.lang === 'vi';
+  document.getElementById('rdRoomNo').textContent = '📝 ' + roomLabel(roomId);
+  const content = document.getElementById('rdContent');
+
+  const entries = Object.entries(state.cleaningRecords)
+    .filter(([id, r]) => r.room === '主管指派事項')
+    .sort((a, b) => (b[1].startTime || 0) - (a[1].startTime || 0));
+
+  // 可勾選的人員（管理員顯示全部，否則只顯示今日上班人員）
+  const staffList = state.isAdmin
+    ? Object.entries(state.staff)
+    : (state.currentStaff || []).map(sid => [sid, state.staff[sid]]).filter(([, s]) => s);
+
+  content.innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">${isVi ? 'Nội dung công việc (nhân viên tự ghi)' : '事項內容（員工自行填寫）'}</div>
+    <textarea id="assignNote" rows="3" placeholder="${isVi ? 'Nhập nội dung...' : '請輸入事項內容...'}"></textarea>
+    <div style="font-size:13px;color:var(--text2);margin:10px 0 6px;">${isVi ? 'Chọn nhân viên (mỗi người tính 1 lần)' : '勾選人員（每人各記一次）'}</div>
+    <div id="assignStaffPick" style="display:flex;flex-wrap:wrap;gap:8px;">
+      ${staffList.length ? staffList.map(([sid, s]) => `
+        <label style="display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" class="assignChk" value="${sid}" style="width:auto;margin:0;"> ${escAssign(s.name)}
+        </label>
+      `).join('') : `<div style="font-size:13px;color:var(--text3);">${isVi ? 'Chưa có nhân viên đăng nhập' : '尚無登入人員'}</div>`}
+    </div>
+    <button class="btn btn-primary btn-lg mt-3" onclick="saveAssignment()">${isVi ? '＋ Lưu' : '＋ 新增事項'}</button>
+    <div class="divider"></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${isVi ? 'Danh sách hôm nay' : '今日事項清單'}</div>
+    <div id="assignList">
+      ${entries.length ? entries.map(([id, r]) => `
+        <div class="card-sm" style="margin-bottom:8px;">
+          <div style="white-space:pre-wrap;font-size:14px;">${escAssign(r.note)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            <span style="font-size:11px;color:var(--text3);">${escAssign(r.by)} · ${formatTime(r.startTime)}</span>
+            <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="deleteAssignment('${id}')">🗑</button>
+          </div>
+        </div>
+      `).join('') : `<div style="font-size:13px;color:var(--text3);">${isVi ? 'Chưa có mục nào' : '尚無事項'}</div>`}
+    </div>
+  `;
+  showModal('modalRoomDetail');
+}
+
+function saveAssignment() {
+  const ta = document.getElementById('assignNote');
+  const note = ta ? ta.value.trim() : '';
+  if (!note) { showToast(state.lang === 'vi' ? 'Vui lòng nhập nội dung' : '請輸入內容'); return; }
+  const byIds = [...document.querySelectorAll('.assignChk:checked')].map(c => c.value);
+  if (!byIds.length) { showToast(state.lang === 'vi' ? 'Vui lòng chọn nhân viên' : '請至少勾選一位人員'); return; }
+  const today = getBusinessDate();
+  const recId = uid();
+  const by = byIds.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean).join('、') || (state.isAdmin ? '管理員' : '');
+  const now = Date.now();
+  const record = { room: '主管指派事項', type: 'assign', note: note, by: by, byIds: byIds, assignees: {}, startTime: now, endTime: now, status: 'completed', _date: today };
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).set(record)
+    .then(() => { showToast('✅ 已新增'); openAssignmentDetail('主管指派事項'); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function deleteAssignment(recId) {
+  if (!confirm(state.lang === 'vi' ? 'Xóa mục này?' : '確定刪除此事項？')) return;
+  const today = getBusinessDate();
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).remove()
+    .then(() => { showToast('✅ 已刪除'); openAssignmentDetail('主管指派事項'); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ════════════════════════════════
+//  補洗沐（勾選人員＋房號，一人一天算一次）
+// ════════════════════════════════
+function openRefillDetail(roomId) {
+  const isVi = state.lang === 'vi';
+  document.getElementById('rdRoomNo').textContent = '🧴 ' + roomLabel(roomId);
+  const content = document.getElementById('rdContent');
+
+  const entries = Object.entries(state.cleaningRecords)
+    .filter(([id, r]) => r.room === '補洗沐')
+    .sort((a, b) => (b[1].startTime || 0) - (a[1].startTime || 0));
+
+  const staffList = state.isAdmin
+    ? Object.entries(state.staff)
+    : (state.currentStaff || []).map(sid => [sid, state.staff[sid]]).filter(([, s]) => s);
+
+  content.innerHTML = `
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">${isVi ? 'Mỗi người tính 1 lần/ngày' : '一人一天算一次'}</div>
+    <div style="font-size:13px;color:var(--text2);margin:0 0 6px;">${isVi ? 'Chọn nhân viên' : '勾選人員'}</div>
+    <div id="refillStaffPick" style="display:flex;flex-wrap:wrap;gap:8px;">
+      ${staffList.length ? staffList.map(([sid, s]) => `
+        <label style="display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" class="refillChk" value="${sid}" style="width:auto;margin:0;"> ${escAssign(s.name)}
+        </label>
+      `).join('') : `<div style="font-size:13px;color:var(--text3);">${isVi ? 'Chưa có nhân viên đăng nhập' : '尚無登入人員'}</div>`}
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin:12px 0 6px;">${isVi ? 'Chọn phòng (có thể chọn nhiều)' : '勾選房號（可多選）'}</div>
+    <div id="refillRoomPick" style="display:flex;flex-wrap:wrap;gap:6px;">
+      ${GUEST_ROOMS.map(rm => `
+        <label style="display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" class="refillRoomChk" value="${rm}" style="width:auto;margin:0;"> ${rm}
+        </label>
+      `).join('')}
+    </div>
+    <button class="btn btn-primary btn-lg mt-3" onclick="saveRefill()">${isVi ? '＋ Lưu' : '＋ 新增'}</button>
+    <div class="divider"></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${isVi ? 'Danh sách hôm nay' : '今日清單'}</div>
+    <div id="refillList">
+      ${entries.length ? entries.map(([id, r]) => `
+        <div class="card-sm" style="margin-bottom:8px;">
+          <div style="font-size:14px;">👤 ${escAssign(r.by)}</div>
+          ${r.rooms && r.rooms.length ? `<div style="font-size:12px;color:var(--text2);margin-top:3px;">🚪 ${r.rooms.join('、')}</div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            <span style="font-size:11px;color:var(--text3);">${formatTime(r.startTime)}</span>
+            <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="deleteRefill('${id}')">🗑</button>
+          </div>
+        </div>
+      `).join('') : `<div style="font-size:13px;color:var(--text3);">${isVi ? 'Chưa có mục nào' : '尚無紀錄'}</div>`}
+    </div>
+  `;
+  showModal('modalRoomDetail');
+}
+
+function saveRefill() {
+  const isVi = state.lang === 'vi';
+  const byIds = [...document.querySelectorAll('.refillChk:checked')].map(c => c.value);
+  if (!byIds.length) { showToast(isVi ? 'Vui lòng chọn nhân viên' : '請至少勾選一位人員'); return; }
+  const rooms = [...document.querySelectorAll('.refillRoomChk:checked')].map(c => c.value);
+  const today = getBusinessDate();
+  const recId = uid();
+  const by = byIds.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean).join('、') || (state.isAdmin ? '管理員' : '');
+  const now = Date.now();
+  const record = { room: '補洗沐', type: 'refill', by: by, byIds: byIds, rooms: rooms, assignees: {}, startTime: now, endTime: now, status: 'completed', _date: today };
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).set(record)
+    .then(() => { showToast('✅ 已新增'); openRefillDetail('補洗沐'); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+function deleteRefill(recId) {
+  if (!confirm(state.lang === 'vi' ? 'Xóa mục này?' : '確定刪除此紀錄？')) return;
+  const today = getBusinessDate();
+  db.ref(`${DB_ROOT}/cleaning/${today}/${recId}`).remove()
+    .then(() => { showToast('✅ 已刪除'); openRefillDetail('補洗沐'); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
+// ════════════════════════════════
 //  START CLEANING MODAL
 // ════════════════════════════════
 function openStartCleaning(roomId) {
@@ -1487,15 +1660,26 @@ function openStartCleaning(roomId) {
   const already = Object.values(state.cleaningRecords).find(r => r.room === roomId && !r.endTime);
   if (already) { showToast(t('alreadyCleaning')); return; }
 
-  document.getElementById('scRoomNo').textContent = roomId;
+  document.getElementById('scRoomNo').textContent = roomLabel(roomId);
   document.getElementById('scRoomNo').dataset.room = roomId;
+
+  // 整理類型：公共清潔卡片固定為「公共清潔」，其餘為一般類型
+  const scType = document.getElementById('scType');
+  if (scType) {
+    if (roomId === '公共清潔') {
+      scType.innerHTML = `<option value="public">${CLEANING_TYPES.public[state.lang]}</option>`;
+    } else {
+      scType.innerHTML = Object.entries(CLEANING_TYPES).filter(([k]) => !['public','assign','stair','refill'].includes(k))
+        .map(([k,v]) => `<option value="${k}">${v[state.lang]}</option>`).join('');
+    }
+  }
 
   // Build area assignment grid — only current shift staff
   const staffList = state.isAdmin
     ? Object.entries(state.staff)
     : state.currentStaff.map(sid => [sid, state.staff[sid]]).filter(([,s]) => s);
   const grid = document.getElementById('areaAssignGrid');
-  grid.innerHTML = Object.entries(AREAS).map(([akey, alabel]) => `
+  grid.innerHTML = Object.entries(areasFor(roomId)).map(([akey, alabel]) => `
     <div class="area-block">
       <div class="area-block-title">${alabel[state.lang]}</div>
       ${[0,1,2].map(i => `
@@ -1520,7 +1704,7 @@ function confirmStartCleaning() {
 
   // Collect assignments
   const assignees = {};
-  Object.keys(AREAS).forEach(akey => {
+  Object.keys(areasFor(roomId)).forEach(akey => {
     const people = [];
     [0,1,2].forEach(i => {
       const sel = document.getElementById(`assign_${akey}_${i}`);
@@ -1581,7 +1765,7 @@ function openEditAssignees(recId, roomId) {
 
   display.innerHTML = `
     <div class="area-assign-grid" id="editAreaGrid_${recId}">
-      ${Object.entries(AREAS).map(([akey, alabel]) => {
+      ${Object.entries(areasFor(rec.room)).map(([akey, alabel]) => {
         const curPeople = (rec.assignees && rec.assignees[akey]) || [];
         return `<div class="area-block">
           <div class="area-block-title">${alabel[state.lang]}</div>
@@ -1600,8 +1784,9 @@ function openEditAssignees(recId, roomId) {
 
 function saveEditAssignees(recId) {
   const today = getBusinessDate();
+  const recCur = state.cleaningRecords[recId];
   const assignees = {};
-  Object.keys(AREAS).forEach(akey => {
+  Object.keys(areasFor(recCur ? recCur.room : null)).forEach(akey => {
     const people = [];
     [0,1,2].forEach(i => {
       const sel = document.getElementById(`edit_${akey}_${i}_${recId}`);
@@ -1620,7 +1805,7 @@ function saveEditAssignees(recId) {
         const merged = { ...rec, assignees };
         display.innerHTML = `
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;display:none;"></div>
-          ${renderAreaAssignView(assignees)}
+          ${renderAreaAssignView(assignees, rec.room)}
           <button class="btn btn-sm btn-outline mt-2" onclick="openEditAssignees('${recId}','')">✏️ 再次修改</button>
         `;
       }
@@ -1794,7 +1979,7 @@ function renderInspectRooms() {
   const floor = document.getElementById('inspFloor') ? document.getElementById('inspFloor').value : 'all';
   const sel = document.getElementById('inspRoom');
   if (!sel) return;
-  let rooms = floor === 'all' ? ALL_ROOMS : (ROOMS[floor] || []);
+  let rooms = floor === 'all' ? GUEST_ROOMS : (ROOMS[floor] || []);
   sel.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join('');
 }
 
@@ -1824,7 +2009,7 @@ function renderInspectOverview() {
     const r = insp.room;
     if (!roomLatest[r] || insp.time > roomLatest[r].time) roomLatest[r] = insp;
   });
-  const rooms = (state.ovFloor && state.ovFloor !== 'all') ? (ROOMS[state.ovFloor]||[]) : ALL_ROOMS;
+  const rooms = (state.ovFloor && state.ovFloor !== 'all') ? (ROOMS[state.ovFloor]||[]) : GUEST_ROOMS;
   grid.innerHTML = rooms.map(roomId => {
     const insp = roomLatest[roomId];
     return `<div class="ov-room ${insp ? 'ov-inspected' : ''}" onclick="inspectRoom('${roomId}')">
@@ -2130,7 +2315,7 @@ function openEditRecord(recId) {
   const recDate = rec._date || getBusinessDate();
 
   // 各區人員選單 HTML
-  const areaSelects = Object.entries(AREAS).map(([akey, alabel]) => {
+  const areaSelects = Object.entries(areasFor(rec.room)).map(([akey, alabel]) => {
     const curPeople = (rec.assignees && rec.assignees[akey]) || [];
     const selects = [0,1,2].map(i => `
       <select id="er_${akey}_${i}" style="width:100%;margin-bottom:4px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-size:13px;">
@@ -2170,8 +2355,9 @@ function saveEditRecord(recId, recDate) {
   const typeEl = document.getElementById('er_type');
   const newType = typeEl ? typeEl.value : null;
 
+  const recCur = state.recentCleanRecords[recId] || state.cleaningRecords[recId];
   const assignees = {};
-  Object.keys(AREAS).forEach(akey => {
+  Object.keys(areasFor(recCur ? recCur.room : null)).forEach(akey => {
     const people = [];
     [0,1,2].forEach(i => {
       const sel = document.getElementById(`er_${akey}_${i}`);
@@ -2235,11 +2421,23 @@ function adminDeleteInspection(inspId) {
 // ════════════════════════════════
 // ─── Helper: get type category ───
 function getTypeCategory(type) {
-  if (type === 'normal' || type === 'rush') return 'clean';
-  if (type === 'deep') return 'maintain';
-  if (type === 'stair') return 'stair';
-  if (type === 'garage') return 'garage';
+  if (type === 'normal' || type === 'rush' || type === 'stay') return 'clean';   // 整房：正常整/趕房/續住整
+  if (type === 'deep' || type === 'small' || type === 'stair') return 'maintain'; // 保養：大保養/小保養（樓梯保養為舊資料，併入保養）
+  if (type === 'garage') return 'garage';   // 車庫保養
+  if (type === 'refill') return 'refill';   // 補洗沐
+  if (type === 'public') return 'public';   // 公共清潔
+  if (type === 'assign') return 'assign';   // 主管指派事項
   return 'clean';
+}
+
+// 取得一筆紀錄的參與人員 sid（含整房區域分配與指派事項填寫人）
+function recParticipants(rec) {
+  const people = new Set();
+  if (rec.assignees) Object.values(rec.assignees).forEach(arr => {
+    if (Array.isArray(arr)) arr.forEach(sid => { if (sid) people.add(sid); });
+  });
+  if (Array.isArray(rec.byIds)) rec.byIds.forEach(sid => { if (sid) people.add(sid); });
+  return [...people];
 }
 
 // ─── Helper: credits per person = 1/unique_people (2 decimal) ───
@@ -2256,16 +2454,36 @@ function getStaffCredits(rec) {
   return result;
 }
 
-// ─── Aggregate records → staff stats {clean, maintain, stair, garage} ───
+// ─── Aggregate records → staff stats {clean, maintain, garage, refill, public, assign} ───
 function aggregateStats(records) {
   const stats = {};
+  const refillSeen = new Set(); // 補洗沐：同一人同一業務日只算一次
+  const ensure = sid => {
+    if (!stats[sid]) stats[sid] = { clean:0, maintain:0, garage:0, refill:0, public:0, assign:0 };
+    return stats[sid];
+  };
   records.forEach(rec => {
     if (!rec.endTime) return;
-    const credits = getStaffCredits(rec);
     const cat = getTypeCategory(rec.type);
-    Object.entries(credits).forEach(([sid, credit]) => {
-      if (!stats[sid]) stats[sid] = { clean:0, maintain:0, stair:0, garage:0 };
-      stats[sid][cat] = Math.round((stats[sid][cat] + credit) * 100) / 100;
+    const people = recParticipants(rec);
+    if (!people.length) return;
+    if (cat === 'refill') {
+      // 補洗沐：一人一天算一次
+      const day = rec._date || getBusinessDate(rec.startTime);
+      people.forEach(sid => {
+        const k = sid + '|' + day;
+        if (refillSeen.has(k)) return;
+        refillSeen.add(k);
+        ensure(sid).refill += 1;
+      });
+      return;
+    }
+    // 公共清潔/指派事項：多人一起每人各記一次（不均分）；其餘整房：1÷人數
+    const fullCount = (cat === 'public' || cat === 'assign');
+    const credit = fullCount ? 1 : Math.round((1 / people.length) * 100) / 100;
+    people.forEach(sid => {
+      const s = ensure(sid);
+      s[cat] = Math.round((s[cat] + credit) * 100) / 100;
     });
   });
   return stats;
@@ -2273,13 +2491,15 @@ function aggregateStats(records) {
 
 function renderReport(container) {
   const bDate = getBusinessDate();
+  // 流水表只列整房類（不含指派事項）；統計則納入全部（含公共清潔、指派事項）
   const records = Object.entries(state.cleaningRecords)
+    .filter(([,r]) => r.type !== 'assign' && r.type !== 'refill')
     .sort((a,b) => (a[1].startTime||0)-(b[1].startTime||0));
-  const recVals = records.map(([,r]) => r);
-  const dailyStats = aggregateStats(recVals);
+  const allRecVals = Object.values(state.cleaningRecords);
+  const dailyStats = aggregateStats(allRecVals);
 
   const tableRows = records.map(([, rec]) => {
-    const areaStr = Object.entries(AREAS).map(([akey, alabel]) => {
+    const areaStr = Object.entries(areasFor(rec.room)).map(([akey, alabel]) => {
       const people = (rec.assignees && rec.assignees[akey]) || [];
       const names = people.map(sid => state.staff[sid] ? state.staff[sid].name : '').filter(Boolean);
       return names.length ? `${alabel[state.lang]}:${names.join('/')}` : '';
@@ -2299,7 +2519,7 @@ function renderReport(container) {
     return `<div class="report-row">
       <div style="flex:1;font-weight:600;">${staff.name}</div>
       <div style="font-size:12px;color:var(--text2);">
-        整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 樓梯 <b>${s.stair}</b> ｜ 車庫 <b>${s.garage}</b>
+        整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 車庫 <b>${s.garage}</b> ｜ 補洗沐 <b>${s.refill||0}</b> ｜ 公共 <b>${s.public||0}</b> ｜ 指派 <b>${s.assign||0}</b>
       </div>
     </div>`;
   }).join('');
@@ -2312,7 +2532,7 @@ function renderReport(container) {
     <div class="card" style="margin-bottom:12px;">
       <div style="font-weight:600;margin-bottom:8px;">👥 今日員工間數</div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
-        整房/趕房 各算 1÷人數 間｜保養/樓梯/車庫 另計，計算至小數第2位
+        整房(正常+趕房+續住)/保養(大+小)/車庫 各算 1÷人數，計算至小數第2位｜公共清潔/指派事項 多人一起每人各記1次｜補洗沐 一人一天算1次
       </div>
       ${staffCountRows || `<div style="color:var(--text2);font-size:14px;">尚無完成紀錄</div>`}
     </div>
@@ -2353,7 +2573,7 @@ function buildWorkbook(bDate, records, monthlyStats) {
 
   // Sheet 1: 流水表
   const logHeaders = ['房號','開始時間','結束時間','整理類型','房間','中間','廁所','樓梯保養','車庫保養','用時(分)'];
-  const logRows = records.map(rec => {
+  const logRows = records.filter(rec => rec.type !== 'assign' && rec.type !== 'refill').map(rec => {
     const g = key => {
       const arr = (rec.assignees && rec.assignees[key]) || [];
       return arr.map(sid => state.staff[sid]?.name || '').filter(Boolean).join('、');
@@ -2373,26 +2593,26 @@ function buildWorkbook(bDate, records, monthlyStats) {
 
   // Sheet 2: 員工每日統計
   const dayStats = aggregateStats(records.filter(r => r.endTime));
-  const dayHeaders = ['姓名','職位','整房間數(正常+趕房)','保養間數(大保養)','樓梯保養間數','車庫保養間數','合計'];
+  const dayHeaders = ['姓名','職位','整房間數(正常+趕房+續住)','保養間數(大+小)','車庫保養間數','補洗沐次數','公共清潔次數','指派事項次數','合計'];
   const dayRows = Object.entries(dayStats).map(([sid, s]) => {
     const st = state.staff[sid];
-    const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
-    return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+    const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
+    return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.garage, s.refill||0, s.public||0, s.assign||0, total];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([dayHeaders, ...dayRows]);
-  ws2['!cols'] = [10,8,18,14,12,12,8].map(w=>({wch:w}));
+  ws2['!cols'] = [10,8,20,14,12,10,12,12,8].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb, ws2, '員工每日間數');
 
   // Sheet 3: 月統計
   if (monthlyStats) {
-    const moHeaders = ['姓名','職位','整房間數','保養間數','樓梯保養間數','車庫保養間數','合計'];
+    const moHeaders = ['姓名','職位','整房間數','保養間數','車庫保養間數','補洗沐次數','公共清潔次數','指派事項次數','合計'];
     const moRows = Object.entries(monthlyStats).map(([sid, s]) => {
       const st = state.staff[sid];
-      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
-      return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+      const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
+      return [st?.name||sid, ROLE_LABELS[st?.role]?.zh||'', s.clean, s.maintain, s.garage, s.refill||0, s.public||0, s.assign||0, total];
     });
     const ws3 = XLSX.utils.aoa_to_sheet([moHeaders, ...moRows]);
-    ws3['!cols'] = [10,8,10,10,12,12,8].map(w=>({wch:w}));
+    ws3['!cols'] = [10,8,10,10,12,10,12,12,8].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws3, '員工月統計');
   }
   return wb;
@@ -2453,11 +2673,11 @@ function showMonthlyStats() {
     const rows = Object.entries(stats).map(([sid, s]) => {
       const staff = state.staff[sid];
       if (!staff) return '';
-      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
+      const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
       return `<div class="report-row">
         <div style="flex:1;font-weight:600;">${staff.name}</div>
         <div style="font-size:12px;color:var(--text2);">
-          整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 樓梯 <b>${s.stair}</b> ｜ 車庫 <b>${s.garage}</b> ｜ 合計 <b>${total}</b>
+          整房 <b>${s.clean}</b> ｜ 保養 <b>${s.maintain}</b> ｜ 車庫 <b>${s.garage}</b> ｜ 補洗沐 <b>${s.refill||0}</b> ｜ 公共 <b>${s.public||0}</b> ｜ 指派 <b>${s.assign||0}</b> ｜ 合計 <b>${total}</b>
         </div>
       </div>`;
     }).join('');
@@ -2468,7 +2688,7 @@ function showMonthlyStats() {
         <div class="card" style="margin-bottom:12px;">
           <div style="font-weight:600;margin-bottom:8px;">📅 ${year}年${month}月 員工月結表</div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
-            整房間數 ｜ 保養間數 ｜ 樓梯保養間數 ｜ 車庫保養間數
+            整房間數 ｜ 保養間數 ｜ 車庫保養間數 ｜ 補洗沐次數 ｜ 公共清潔次數 ｜ 指派事項次數
           </div>
           ${rows || '<div style="color:var(--text2);">本月尚無資料</div>'}
         </div>`;
@@ -2543,7 +2763,7 @@ function renderCleanRecord(rec) {
   const recId = rec._id;
   const typeInfo = CLEANING_TYPES[rec.type] || {};
   const isComplete = !!rec.endTime;
-  const areaHtml = Object.entries(AREAS).map(([akey, alabel]) => {
+  const areaHtml = Object.entries(areasFor(rec.room)).map(([akey, alabel]) => {
     const people = (rec.assignees && rec.assignees[akey]) || [];
     const names = people.map(sid => state.staff[sid]?.name||'').filter(Boolean);
     return names.length ? `<div class="area-tag">${alabel[state.lang]}: ${names.join('、')}</div>` : '';
@@ -2554,7 +2774,7 @@ function renderCleanRecord(rec) {
       <div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:16px;">🧹</span>
-          <div class="record-room">🏠 ${rec.room}</div>
+          <div class="record-room">🏠 ${roomLabel(rec.room)}</div>
         </div>
         <div class="record-times">
           ${t('startTime')}: ${formatTime(rec.startTime)}
@@ -2579,7 +2799,7 @@ function renderInspRecord(rec) {
       <div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:16px;">🔍</span>
-          <div class="record-room">🏠 ${rec.room}</div>
+          <div class="record-room">🏠 ${roomLabel(rec.room)}</div>
         </div>
         <div class="record-times">查房：${formatTime(rec.time)} ｜ ${rec.inspector||''}</div>
       </div>
@@ -2856,7 +3076,7 @@ function exportDailyCleanLog() {
   const bDate = document.getElementById('rptDailyDate')?.value || localDateStr(new Date());
   showToast('載入中...');
   db.ref(DB_ROOT+'/cleaning/' + bDate).once('value', snap => {
-    const records = Object.values(snap.val() || {}).sort((a,b)=>(a.startTime||0)-(b.startTime||0));
+    const records = Object.values(snap.val() || {}).filter(r => r.type !== 'assign' && r.type !== 'refill').sort((a,b)=>(a.startTime||0)-(b.startTime||0));
     (function doExport() {
   const wb = XLSX.utils.book_new();
   const title = [`整房紀錄表　${bDate}`];
@@ -2895,36 +3115,28 @@ async function exportDailyStaffCount() {
 
   db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(prefix).endAt(prefix+'\uf8ff').once('value', async snap => {
     const allData = snap.val() || {};
-    // Monthly stats
-    const monthlyStats = {};
-    Object.values(allData).forEach(dayRecs => {
-      Object.values(dayRecs).forEach(rec => {
-        if (!rec.endTime) return;
-        const credits = getStaffCredits(rec);
-        const cat = getTypeCategory(rec.type);
-        Object.entries(credits).forEach(([sid, cr]) => {
-          if (!monthlyStats[sid]) monthlyStats[sid] = {clean:0,maintain:0,stair:0,garage:0};
-          monthlyStats[sid][cat] = Math.round((monthlyStats[sid][cat]+cr)*100)/100;
-        });
-      });
-    });
+    // Monthly stats（與其他報表一致：公共清潔/指派事項每人各記一次）
+    const allRecs = [];
+    Object.values(allData).forEach(dayRecs => Object.values(dayRecs).forEach(r => allRecs.push(r)));
+    const monthlyStats = aggregateStats(allRecs.filter(r => r.endTime));
     // Daily stats from Firebase for selected date
     const dayData = allData[bDate] || {};
     const dailyStats = aggregateStats(Object.values(dayData));
     const wb = XLSX.utils.book_new();
-    const headers = ['姓名','職位','整房','保養','樓梯保養','車庫保養','當日合計','本月整房累積','本月保養累積','本月合計'];
+    const headers = ['姓名','職位','整房','保養','車庫保養','補洗沐','公共清潔','指派事項','當日合計','本月整房累積','本月保養累積','本月車庫累積','本月補洗沐累積','本月公共累積','本月指派累積','本月合計'];
     const staffList = Object.keys({...dailyStats,...monthlyStats});
+    const blank = {clean:0,maintain:0,garage:0,refill:0,public:0,assign:0};
     const rows = staffList.map(sid => {
       const s = state.staff[sid]; if (!s) return null;
-      const d = dailyStats[sid] || {clean:0,maintain:0,stair:0,garage:0};
-      const m = monthlyStats[sid] || {clean:0,maintain:0,stair:0,garage:0};
-      const dTotal = Math.round((d.clean+d.maintain+d.stair+d.garage)*100)/100;
-      const mTotal = Math.round((m.clean+m.maintain+m.stair+m.garage)*100)/100;
-      return [s.name, ROLE_LABELS[s.role]?.zh||'', d.clean, d.maintain, d.stair, d.garage, dTotal, m.clean, m.maintain, mTotal];
+      const d = {...blank, ...(dailyStats[sid]||{})};
+      const m = {...blank, ...(monthlyStats[sid]||{})};
+      const dTotal = Math.round((d.clean+d.maintain+d.garage)*100)/100;
+      const mTotal = Math.round((m.clean+m.maintain+m.garage)*100)/100;
+      return [s.name, ROLE_LABELS[s.role]?.zh||'', d.clean, d.maintain, d.garage, d.refill, d.public, d.assign, dTotal, m.clean, m.maintain, m.garage, m.refill, m.public, m.assign, mTotal];
     }).filter(Boolean);
     const ws = XLSX.utils.aoa_to_sheet([[`員工整房間數　${bDate}`], headers, ...rows]);
-    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:9}}];
-    applyPrintStyle(ws, '', [10,8,6,6,8,8,8,10,10,8]);
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:15}}];
+    applyPrintStyle(ws, '', [10,8,6,6,8,8,8,8,8,10,10,10,10,10,10,8]);
     XLSX.utils.book_append_sheet(wb, ws, `間數_${bDate}`);
     XLSX.writeFile(wb, `員工間數_${bDate}.xlsx`);
     showToast('✅ 員工間數已下載');
@@ -3067,24 +3279,24 @@ function exportWeeklyReport() {
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: 人員整房統計
-    const sumHeaders = ['姓名','職位','正常整','大保養','樓梯保養','車庫保養','本週合計'];
+    const sumHeaders = ['姓名','職位','整房','保養','車庫保養','補洗沐','公共清潔','指派事項','本週合計'];
     const sumRows = Object.entries(stats).map(([sid,s]) => {
       const st = state.staff[sid]; if(!st) return null;
-      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
-      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+      const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
+      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.garage, s.refill||0, s.public||0, s.assign||0, total];
     }).filter(Boolean);
     if (sumRows.length) {
-      const tot = sumRows.reduce((acc,r)=>{ [2,3,4,5,6].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc;}, ['合計','','','','','','']);
-      [2,3,4,5,6].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
+      const tot = sumRows.reduce((acc,r)=>{ [2,3,4,5,6,7,8].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc;}, ['合計','','','','','','','','']);
+      [2,3,4,5,6,7,8].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
       sumRows.push(tot);
     }
     const wsSum = XLSX.utils.aoa_to_sheet([[`本週整房統計　${period}`], sumHeaders, ...sumRows]);
-    wsSum['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:6}}];
-    applyPrintStyle(wsSum, '', [10,8,6,6,8,8,8]);
+    wsSum['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:8}}];
+    applyPrintStyle(wsSum, '', [10,8,6,6,8,8,8,8,8]);
     XLSX.utils.book_append_sheet(wb, wsSum, '人員統計');
 
     // Sheet 2: 特殊保養紀錄
-    const specRecs = doneRecs.filter(r => ['deep','stair','garage'].includes(r.type))
+    const specRecs = doneRecs.filter(r => ['deep','small','stair','garage'].includes(r.type))
                              .sort((a,b)=>(a.startTime||0)-(b.startTime||0));
     const specHeaders = ['房號','日期','整理類型','開始時間','結束時間','人員'];
     const specRows = specRecs.map(rec => {
@@ -3137,24 +3349,24 @@ function exportMonthlyReport() {
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: 人員整房統計
-    const moHeaders = ['姓名','職位','正常整','大保養','樓梯保養','車庫保養','本月合計'];
+    const moHeaders = ['姓名','職位','整房','保養','車庫保養','補洗沐','公共清潔','指派事項','本月合計'];
     const moRows = Object.entries(stats).map(([sid,s]) => {
       const st = state.staff[sid]; if(!st) return null;
-      const total = Math.round((s.clean+s.maintain+s.stair+s.garage)*100)/100;
-      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.stair, s.garage, total];
+      const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
+      return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.garage, s.refill||0, s.public||0, s.assign||0, total];
     }).filter(Boolean);
     if (moRows.length) {
-      const tot = moRows.reduce((acc,r)=>{ [2,3,4,5,6].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc; }, ['合計','','','','','','']);
-      [2,3,4,5,6].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
+      const tot = moRows.reduce((acc,r)=>{ [2,3,4,5,6,7,8].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc; }, ['合計','','','','','','','','']);
+      [2,3,4,5,6,7,8].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
       moRows.push(tot);
     }
     const wsMo = XLSX.utils.aoa_to_sheet([[`${prefix} 月份整房統計`], moHeaders, ...moRows]);
-    wsMo['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:6}}];
-    applyPrintStyle(wsMo, '', [10,8,6,6,8,8,8]);
+    wsMo['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:8}}];
+    applyPrintStyle(wsMo, '', [10,8,6,6,8,8,8,8,8]);
     XLSX.utils.book_append_sheet(wb, wsMo, '人員統計');
 
     // Sheet 2: 特殊保養紀錄
-    const specTypes = ['deep','stair','garage'];
+    const specTypes = ['deep','small','stair','garage'];
     const specRecs = doneRecs.filter(r => specTypes.includes(r.type))
                              .sort((a,b)=>(a.startTime||0)-(b.startTime||0));
     const specHeaders = ['房號','日期','整理類型','開始時間','結束時間','人員'];
