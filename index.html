@@ -236,6 +236,33 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
 <body>
 
 <!-- ══════════ LOGIN PAGE ══════════ -->
+<!-- ══════════ 密碼門 GATE ══════════ -->
+<div id="gatePage" style="position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto;">
+  <div style="font-size:40px;margin-bottom:8px;">🔒</div>
+  <div style="font-size:20px;font-weight:700;color:var(--primary);">今日密碼</div>
+  <div style="font-size:13px;color:var(--text2);margin-top:4px;">Mật khẩu hôm nay</div>
+  <input id="gateInput" type="tel" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="● ● ● ● ● ●"
+    style="margin-top:20px;width:210px;text-align:center;letter-spacing:8px;font-size:24px;padding:12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg2);color:var(--text);"
+    onkeydown="if(event.key==='Enter')submitGate()">
+  <button class="btn btn-primary btn-lg" style="width:210px;margin-top:14px;" onclick="submitGate()">進入 / Vào</button>
+  <div id="gateMsg" style="font-size:13px;color:var(--danger);margin-top:10px;min-height:18px;text-align:center;"></div>
+  <button class="btn btn-outline btn-sm" style="margin-top:24px;width:auto;align-self:center;" onclick="toggleGateAdmin()">🔧 主管：產生今日密碼</button>
+  <div id="gateAdmin" class="hidden" style="margin-top:14px;width:250px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">主管密碼</div>
+    <input id="gateAdminPwd" type="password" placeholder="主管密碼"
+      style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);margin-bottom:8px;">
+    <button class="btn btn-primary" style="width:100%;" onclick="generateTodayCode()">產生今日密碼</button>
+    <div id="gateCodeBox" class="hidden" style="margin-top:12px;text-align:center;">
+      <div style="font-size:12px;color:var(--text2);">今日密碼（請貼到群組）</div>
+      <div id="gateCodeView" style="font-size:30px;font-weight:800;letter-spacing:6px;color:var(--success);margin:6px 0;"></div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-outline btn-sm" style="width:auto;" onclick="copyTodayCode()">📋 複製</button>
+        <button class="btn btn-success btn-sm" style="width:auto;" onclick="enterAfterGenerate()">進入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="loginPage">
   <div class="login-header">
     <div class="login-logo">🏨</div>
@@ -3420,8 +3447,71 @@ function _startApp(){
   init();
   loadInspPeriod();
 }
+// ════════════════════════════════
+//  每日密碼門 GATE（一館）
+// ════════════════════════════════
+const GATE_SALT = 'HMOTEL-JT-1kan-#gate-2026';
+async function sha256hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function gateBizDate(){ return getBusinessDate(); }
+function gateOKKey(){ return 'gate1OK_'+gateBizDate(); }
+function hideGate(){ const g=document.getElementById('gatePage'); if(g) g.style.display='none'; }
+function showGate(){ const g=document.getElementById('gatePage'); if(g) g.style.display='flex'; }
+function checkGate(){
+  if (localStorage.getItem(gateOKKey())==='1') { hideGate(); }
+  else { showGate(); }
+}
+async function submitGate(){
+  const code = (document.getElementById('gateInput').value||'').trim();
+  const msg = document.getElementById('gateMsg');
+  if (!/^[0-9]{6}$/.test(code)) { msg.textContent='請輸入 6 位數字 / Nhập 6 chữ số'; return; }
+  if (!db) { msg.textContent='連線中，請稍候… / Đang kết nối…'; return; }
+  const today = gateBizDate();
+  const snap = await db.ref('/gate1/'+today+'/h').once('value');
+  const stored = snap.val();
+  if (!stored) { msg.textContent='今日密碼尚未產生，請聯絡主管 / Chưa có mật khẩu, hỏi quản lý'; return; }
+  const h = await sha256hex(GATE_SALT+':'+today+':'+code);
+  if (h===stored) {
+    localStorage.setItem(gateOKKey(),'1');
+    document.getElementById('gateInput').value=''; msg.textContent='';
+    hideGate();
+  } else {
+    msg.textContent='密碼錯誤 / Sai mật khẩu';
+    document.getElementById('gateInput').value='';
+  }
+}
+function toggleGateAdmin(){ document.getElementById('gateAdmin').classList.toggle('hidden'); }
+async function generateTodayCode(){
+  if (!db) { showToast('連線中…'); return; }
+  const pwd = document.getElementById('gateAdminPwd').value;
+  const snap = await db.ref('/config/adminPassword').once('value');
+  const stored = snap.val() || ADMIN_PWD_DEFAULT;
+  if (pwd !== stored) { showToast('❌ 主管密碼錯誤'); return; }
+  const code = String(Math.floor(100000 + Math.random()*900000));
+  const today = gateBizDate();
+  const h = await sha256hex(GATE_SALT+':'+today+':'+code);
+  await db.ref('/gate1/'+today).set({ h, setAt: Date.now() });
+  localStorage.setItem('gate1Code_'+today, code);
+  localStorage.setItem(gateOKKey(),'1');
+  document.getElementById('gateCodeView').textContent = code;
+  document.getElementById('gateCodeBox').classList.remove('hidden');
+  document.getElementById('gateAdminPwd').value='';
+  showToast('✅ 今日密碼已產生');
+}
+function copyTodayCode(){
+  const code = document.getElementById('gateCodeView').textContent;
+  const txt = '【一館 今日房務密碼 / Mật khẩu hôm nay】'+code+'\n（今天有效，明天會換 / Hôm nay dùng, mai đổi）';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(()=>showToast('📋 已複製，貼到群組')).catch(()=>showToast('密碼：'+code));
+  } else { showToast('密碼：'+code); }
+}
+function enterAfterGenerate(){ hideGate(); }
+
 window.addEventListener('DOMContentLoaded', () => {
   applyTranslations();
+  checkGate();
   try {
     if (firebase.auth) {
       firebase.auth().onAuthStateChanged(u => { if (u) _startApp(); });
