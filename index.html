@@ -222,6 +222,7 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
 .insp-btn.insp-ok{background:var(--success);border-color:var(--success);color:#fff;}
 .insp-btn.insp-defect{background:var(--danger);border-color:var(--danger);color:#fff;}
 .insp-btn.insp-na{background:var(--bg4);border-color:var(--border2);color:var(--text3);}
+.insp-btn.insp-fixed{background:var(--warning);border-color:var(--warning);color:#fff;}
 .insp-reason{width:100%;margin-top:5px;font-size:12px;padding:6px 8px;}
 /* ── OVERVIEW ROOM CARD ── */
 .ov-room{background:var(--bg2);border-radius:var(--radius-sm);padding:8px 6px 8px 10px;cursor:pointer;border-left:4px solid #555;min-height:64px;}
@@ -329,10 +330,12 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
           <button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="setRecDate('today')">今日</button>
         </div>
       </div>
-      <div style="display:flex;gap:6px;padding:0 14px 8px;flex-shrink:0;">
+      <div style="display:flex;gap:6px;padding:0 14px 8px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <button class="floor-btn active" data-rec="all"   onclick="setRecFilter('all')">全部</button>
         <button class="floor-btn" data-rec="clean" onclick="setRecFilter('clean')">🧹 整房</button>
         <button class="floor-btn" data-rec="insp"  onclick="setRecFilter('insp')">🔍 查房</button>
+        <button class="floor-btn" data-rec="maint" onclick="setRecFilter('maint')">🛠️ 工務</button>
+        <button class="floor-btn" data-rec="abnormal" onclick="setRecFilter('abnormal')">⚠️ 未完成/異常</button>
       </div>
       <div id="recordsList"></div>
     </div>
@@ -404,6 +407,25 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
     <div id="tab-management" class="tab-page">
       <div id="mgmtContent" style="padding:14px;"></div>
     </div>
+
+    <!-- ── Tab: Maintenance (工務巡檢) ── -->
+    <div id="tab-maint" class="tab-page">
+      <div class="section-hdr">
+        <div class="section-title">🛠️ 工務巡檢</div>
+        <button class="btn btn-sm btn-success" onclick="exportMaintExcel()">📊 匯出Excel</button>
+      </div>
+      <div id="maintMonthLabel" style="font-size:12px;color:var(--primary);padding:0 14px 6px;font-weight:600;flex-shrink:0;"></div>
+      <div style="font-size:11px;color:var(--text3);padding:0 14px 8px;flex-shrink:0;">每月每處巡檢一次，完成後亮起；每月自動重新開始。狀態：正常／異常已維修／異常待處理。</div>
+      <div style="display:flex;gap:6px;padding:0 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;">
+        <button class="floor-btn active" data-mt="all" onclick="setMaintFilter('all')">全部</button>
+        <button class="floor-btn" data-mt="1區" onclick="setMaintFilter('1區')">1區</button>
+        <button class="floor-btn" data-mt="2區" onclick="setMaintFilter('2區')">2區</button>
+        <button class="floor-btn" data-mt="3區" onclick="setMaintFilter('3區')">3區</button>
+        <button class="floor-btn" data-mt="5F" onclick="setMaintFilter('5F')">5F</button>
+        <button class="floor-btn" data-mt="public" onclick="setMaintFilter('public')">公共空間</button>
+      </div>
+      <div id="maintOverviewGrid" class="room-grid" style="flex-shrink:0;"></div>
+    </div>
   </div>
 
   <!-- Bottom Nav -->
@@ -419,6 +441,9 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
     </button>
     <button class="nav-item" data-tab="inspection" onclick="switchTab('inspection')">
       <span class="nav-icon">🔍</span><span id="nav-inspection">查房</span>
+    </button>
+    <button class="nav-item" data-tab="maint" onclick="switchTab('maint')">
+      <span class="nav-icon">🛠️</span><span id="nav-maint">工務</span>
     </button>
     <button class="nav-item" data-tab="reports" onclick="switchTab('reports')">
       <span class="nav-icon">📊</span><span id="nav-reports">報表</span>
@@ -506,6 +531,28 @@ label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;}
 </div>
 
 <!-- Inspection Modal -->
+<div id="modalMaint" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalMaint')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="maintModalTitle">工務巡檢</span>
+      <span class="modal-close" onclick="closeModal('modalMaint')">✕</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="progress-bar-wrap" style="flex:1;margin:0;">
+        <div class="progress-bar" id="maintProgress" style="width:0%"></div>
+      </div>
+      <div id="maintProgressLabel" style="font-size:12px;color:var(--text2);white-space:nowrap;min-width:40px;text-align:right;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">
+      每項請選擇：<span style="color:var(--success);">正常</span> ／ <span style="color:var(--warning);">異常已維修</span> ／ <span style="color:var(--danger);">異常待處理</span>（需填備註）
+    </div>
+    <div id="maintChecklistItems"></div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-success btn-lg" onclick="completeMaint()">✅ 完成巡檢</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalInspection" class="modal-overlay hidden" onclick="closeModalOverlay(event,'modalInspection')">
   <div class="modal-box">
     <div class="modal-title">
@@ -799,6 +846,101 @@ const INSPECTION_CATEGORIES = [
 // Keep legacy for any old references
 const INSPECTION_ITEMS = INSPECTION_CATEGORIES.flatMap(c => c.items.map(i => ({...i, zh:i.name, vi:i.name})));
 
+// ════════════════════════════════
+//  工務巡檢（每月每處輪一次）
+// ════════════════════════════════
+const MAINT_ROOM_CATEGORIES = [
+  { label:'房間設備', items:[
+    {id:'m_e1',name:'冷氣設備面板'},{id:'m_e2',name:'冷氣出風口＋濾網'},{id:'m_e3',name:'開關'},
+    {id:'m_e4',name:'插座'},{id:'m_e5',name:'電視及遙控器'},{id:'m_e6',name:'電視整線'},
+    {id:'m_e7',name:'音響'},{id:'m_e8',name:'服務送達燈'},{id:'m_e9',name:'冰箱'},
+    {id:'m_e10',name:'電話'},{id:'m_e11',name:'消防設備'},
+  ]},
+  { label:'房間軟裝', items:[
+    {id:'m_s1',name:'壁掛架'},{id:'m_s2',name:'衣帽架'},{id:'m_s3',name:'床頭櫃'},
+    {id:'m_s4',name:'床'},{id:'m_s5',name:'茶几'},{id:'m_s6',name:'沙發(檢查椅腳歪斜更換)'},
+    {id:'m_s7',name:'梳妝椅'},{id:'m_s8',name:'梳妝台(桌子是否傾斜)'},{id:'m_s9',name:'窗簾/捲簾'},
+  ]},
+  { label:'房間硬體', items:[
+    {id:'m_h1',name:'牆面/壁紙是否損壞'},{id:'m_h2',name:'地板凹陷或翹起'},
+    {id:'m_h3',name:'窗戶/拍拍門'},{id:'m_h4',name:'紗窗'},
+  ]},
+  { label:'廁所設備', items:[
+    {id:'m_b1',name:'淋浴柱／淋浴門/邊條'},{id:'m_b2',name:'馬桶'},{id:'m_b3',name:'面盆/水塞排水正常'},
+    {id:'m_b4',name:'浴缸及龍頭/水塞排水正常'},{id:'m_b5',name:'汽泡設備/水塞排水正常'},{id:'m_b6',name:'抽風機'},
+    {id:'m_b7',name:'地板'},{id:'m_b8',name:'牆面'},{id:'m_b9',name:'鏡子(破損)'},
+    {id:'m_b10',name:'淋浴間地面發霉打矽利康'},{id:'m_b11',name:'吹風機(是否容易被拆走)'},
+  ]},
+  { label:'車庫', items:[
+    {id:'m_g1',name:'電箱(106.305小門內)'},{id:'m_g2',name:'鐵捲門及開關'},{id:'m_g3',name:'車庫內電燈'},
+    {id:'m_g4',name:'取餐檯'},{id:'m_g5',name:'火警發信機'},{id:'m_g6',name:'消防設備'},
+    {id:'m_g7',name:'壁面'},{id:'m_g8',name:'地板'},
+  ]},
+  { label:'樓梯', items:[
+    {id:'m_t1',name:'壁面'},{id:'m_t2',name:'地板'},{id:'m_t3',name:'電燈'},
+  ]},
+];
+// 公共空間巡檢（每個分區為一個巡檢單位，內含子分類）
+const MAINT_ZONES = {
+  driveway: { label:'車道外觀空間', cats:[
+    { label:'車道外觀', items:[
+      {id:'z_d1',name:'樹下地燈'},{id:'z_d2',name:'消防栓'},{id:'z_d3',name:'車道燈'},
+      {id:'z_d4',name:'監視器設備'},{id:'z_d5',name:'廣告電視'},{id:'z_d6',name:'廣告LED螢幕'},
+      {id:'z_d7',name:'外觀燈(招牌燈)'},{id:'z_d8',name:'旅館周遭外觀是否有破損'},
+    ]},
+  ]},
+  business: { label:'商務樓／頂樓', cats:[
+    { label:'商務樓', items:[
+      {id:'z_b1',name:'接待室開關及線路'},{id:'z_b2',name:'接待室飲水機'},{id:'z_b3',name:'接待室冷氣'},
+      {id:'z_b4',name:'接待室廁所設備'},{id:'z_b5',name:'電梯通話裝置'},
+    ]},
+    { label:'頂樓', items:[
+      {id:'z_r1',name:'空調設備1.2號機'},{id:'z_r2',name:'濾水設備'},{id:'z_r3',name:'柴油(是否要加油)'},
+      {id:'z_r4',name:'頂樓储水槽是否洩漏溢出'},{id:'z_r5',name:'3F小門後空地'},{id:'z_r6',name:'507外電梯機房'},
+      {id:'z_r7',name:'507外小門後空地'},
+    ]},
+  ]},
+  counter: { label:'櫃台', cats:[
+    { label:'櫃台', items:[
+      {id:'z_c1',name:'監視器系統'},{id:'z_c2',name:'靈知系統'},{id:'z_c3',name:'消防設備'},
+      {id:'z_c4',name:'冷氣'},{id:'z_c5',name:'柵欄機'},
+    ]},
+  ]},
+  office: { label:'辦公樓／機房', cats:[
+    { label:'辦公樓/機房', items:[
+      {id:'z_o1',name:'電話系統設備'},{id:'z_o2',name:'VOD網路系統'},{id:'z_o3',name:'監視器系統'},
+      {id:'z_o4',name:'瓦斯鍋爐'},{id:'z_o5',name:'瓦斯遮斷閥'},{id:'z_o6',name:'消防發電機'},
+      {id:'z_o7',name:'大電盤'},{id:'z_o8',name:'水塔'},
+    ]},
+  ]},
+  housekeeping: { label:'房務室／機房', cats:[
+    { label:'房務室', items:[
+      {id:'z_h1',name:'消防抽水設備'},{id:'z_h2',name:'地下水井'},{id:'z_h3',name:'鍋爐設備'},
+      {id:'z_h4',name:'鐵捲門'},{id:'z_h5',name:'電箱/配電盤等等檢查'},{id:'z_h6',name:'布巾區鐵皮是否傾斜'},
+    ]},
+    { label:'房務室廚房', items:[
+      {id:'z_k1',name:'廚房設備是否正常'},
+    ]},
+  ]},
+};
+const MAINT_ZONE_KEYS = Object.keys(MAINT_ZONES);
+const MAINT_STATUS = {
+  ok:      {label:'正常',       cls:'insp-ok'},
+  fixed:   {label:'異常已維修', cls:'insp-fixed'},
+  pending: {label:'異常待處理', cls:'insp-defect'}
+};
+function maintCategoriesFor(unitId) {
+  if (MAINT_ZONES[unitId]) return MAINT_ZONES[unitId].cats;
+  return MAINT_ROOM_CATEGORIES;
+}
+function maintUnitLabel(unitId) {
+  return MAINT_ZONES[unitId] ? MAINT_ZONES[unitId].label : unitId;
+}
+function maintMonthStr(ts) {
+  const d = ts ? new Date(ts) : new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 const DEFAULT_STAFF = [
   {name:'小美', role:'cleaner'},
   {name:'Lan', role:'cleaner'},
@@ -925,7 +1067,11 @@ let state = {
   syncTime: null,
   inspPeriod: null,
   recFilter: 'all',
-  recentCleanRecords: {}
+  recentCleanRecords: {},
+  maintInspections: {},
+  maintFilter: 'all',
+  currentMaintUnit: null,
+  currentMaintItems: {}
 };
 
 // ════════════════════════════════
@@ -1115,6 +1261,13 @@ function setupListeners() {
   db.ref(DB_ROOT+'/inspections').on('value', snap => {
     state.inspections = snap.val() || {};
     if (state.currentTab === 'inspection') renderInspectHistory();
+  });
+
+  // 工務巡檢
+  db.ref(DB_ROOT+'/maint').on('value', snap => {
+    state.maintInspections = snap.val() || {};
+    if (state.currentTab === 'maint') renderMaintOverview();
+    if (state.currentTab === 'records') renderRecords();
   });
 
   // Sync every 30s
@@ -1363,6 +1516,7 @@ function switchTab(tab) {
   if (tab === 'records') initRecDatePicker();
   if (tab === 'issues') renderIssues();
   if (tab === 'inspection') { renderInspectRooms(); renderInspectHistory(); }
+  if (tab === 'maint') renderMaintOverview();
   if (tab === 'management') renderManagement();
   if (tab === 'reports') renderReports();
 }
@@ -2002,6 +2156,258 @@ function resolveIssue(issId) {
 // ════════════════════════════════
 //  INSPECTION TAB
 // ════════════════════════════════
+// ════════════════════════════════
+//  工務巡檢 功能
+// ════════════════════════════════
+function escapeHtml(s) { return escAssign(s); }
+function maintUnitsFor(filter) {
+  if (filter === 'public') return [...MAINT_ZONE_KEYS];
+  if (filter && filter !== 'all') return (ROOMS[filter] || []).slice();
+  return [...GUEST_ROOMS, ...MAINT_ZONE_KEYS];
+}
+function maintDoneMap() {
+  const month = maintMonthStr();
+  const map = {};
+  Object.values(state.maintInspections).forEach(rec => {
+    if (!rec || rec.month !== month) return;
+    if (!map[rec.unit] || (rec.time || 0) > (map[rec.unit].time || 0)) map[rec.unit] = rec;
+  });
+  return map;
+}
+function setMaintFilter(f) {
+  state.maintFilter = f;
+  document.querySelectorAll('[data-mt]').forEach(b => b.classList.toggle('active', b.dataset.mt === f));
+  renderMaintOverview();
+}
+function renderMaintOverview() {
+  const lbl = document.getElementById('maintMonthLabel');
+  if (lbl) lbl.textContent = '📅 本月：' + maintMonthStr();
+  const grid = document.getElementById('maintOverviewGrid');
+  if (!grid) return;
+  const done = maintDoneMap();
+  const units = maintUnitsFor(state.maintFilter || 'all');
+  grid.innerHTML = units.map(unit => {
+    const rec = done[unit];
+    const isZone = !!MAINT_ZONES[unit];
+    const label = maintUnitLabel(unit);
+    const pend = rec ? (rec.pendingCount || 0) : 0;
+    return `<div class="ov-room ${rec ? 'ov-inspected' : ''}" onclick="openMaint('${unit}')">
+      <div class="ov-no" style="${isZone ? 'font-size:12px;line-height:1.25;' : ''}">${label}</div>
+      ${rec
+        ? `<div class="ov-date" style="font-size:10px;color:var(--primary);">${formatDate(rec.time)}</div>
+           <div style="font-size:10px;color:${pend ? 'var(--danger)' : 'var(--text2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${pend ? ('待處理 ' + pend) : (rec.inspector || '已巡')}</div>`
+        : `<div class="ov-status" style="font-size:10px;color:var(--text3);">未巡</div>`}
+    </div>`;
+  }).join('');
+}
+function openMaint(unitId) {
+  state.currentMaintUnit = unitId;
+  state.currentMaintItems = {};
+  maintCategoriesFor(unitId).forEach(cat => cat.items.forEach(it => {
+    state.currentMaintItems[it.id] = { status: 'ok', reason: '' };
+  }));
+  document.getElementById('maintModalTitle').textContent = '🛠️ ' + maintUnitLabel(unitId);
+  renderMaintChecklist();
+  showModal('modalMaint');
+}
+function renderMaintChecklist() {
+  const c = document.getElementById('maintChecklistItems');
+  c.innerHTML = maintCategoriesFor(state.currentMaintUnit).map(cat => `
+    <div style="margin-bottom:18px;">
+      <div class="insp-cat-title">${cat.label}</div>
+      ${cat.items.map(it => renderMaintItem(it)).join('')}
+    </div>`).join('');
+  updateMaintProgress();
+}
+function renderMaintItem(item) {
+  const cur = state.currentMaintItems[item.id] || {};
+  const st = cur.status;
+  return `<div class="insp-item" id="mt_${item.id}">
+    <div class="insp-item-row">
+      <div class="insp-item-name">${item.name}</div>
+      <div class="insp-btns">
+        <button class="insp-btn ${st==='ok'?'insp-ok':''}" onclick="setMaintStatus('${item.id}','ok')">正常</button>
+        <button class="insp-btn ${st==='fixed'?'insp-fixed':''}" onclick="setMaintStatus('${item.id}','fixed')">已維修</button>
+        <button class="insp-btn ${st==='pending'?'insp-defect':''}" onclick="setMaintStatus('${item.id}','pending')">待處理</button>
+      </div>
+    </div>
+    ${st==='pending' ? `<input class="insp-reason" type="text" placeholder="請填寫待處理備註…"
+      value="${(cur.reason||'').replace(/"/g,'&quot;')}"
+      oninput="setMaintReason('${item.id}',this.value)">` : ''}
+  </div>`;
+}
+function findMaintItem(id) {
+  for (const cat of maintCategoriesFor(state.currentMaintUnit))
+    for (const it of cat.items) if (it.id === id) return it;
+  return null;
+}
+function setMaintStatus(itemId, status) {
+  if (!state.currentMaintItems[itemId]) state.currentMaintItems[itemId] = {};
+  state.currentMaintItems[itemId].status = status;
+  if (status !== 'pending') state.currentMaintItems[itemId].reason = '';
+  const def = findMaintItem(itemId);
+  const el = document.getElementById(`mt_${itemId}`);
+  if (def && el) el.outerHTML = renderMaintItem(def);
+  updateMaintProgress();
+}
+function setMaintReason(itemId, reason) {
+  if (!state.currentMaintItems[itemId]) state.currentMaintItems[itemId] = {};
+  state.currentMaintItems[itemId].reason = reason;
+}
+function updateMaintProgress() {
+  const all = maintCategoriesFor(state.currentMaintUnit).flatMap(c => c.items);
+  const total = all.length;
+  const doneN = all.filter(i => state.currentMaintItems[i.id]?.status).length;
+  const pct = total ? Math.round((doneN / total) * 100) : 0;
+  const bar = document.getElementById('maintProgress');
+  const lbl = document.getElementById('maintProgressLabel');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = `${doneN}/${total}`;
+}
+function completeMaint() {
+  const unit = state.currentMaintUnit;
+  if (!unit) return;
+  const all = maintCategoriesFor(unit).flatMap(c => c.items);
+  const missing = all.filter(i => state.currentMaintItems[i.id]?.status === 'pending' && !(state.currentMaintItems[i.id]?.reason || '').trim());
+  if (missing.length) { showToast('「異常待處理」項目請填寫備註'); return; }
+  const pendingCount = all.filter(i => state.currentMaintItems[i.id]?.status === 'pending').length;
+  const fixedCount = all.filter(i => state.currentMaintItems[i.id]?.status === 'fixed').length;
+  const inspector = state.isAdmin ? '管理員' :
+    state.currentStaff.map(sid => state.staff[sid]?.name || '').filter(Boolean).join('、');
+  const record = {
+    unit: unit, unitLabel: maintUnitLabel(unit), month: maintMonthStr(),
+    inspector: inspector, date: getBusinessDate(), time: Date.now(),
+    items: state.currentMaintItems, totalItems: all.length,
+    pendingCount: pendingCount, fixedCount: fixedCount
+  };
+  db.ref(DB_ROOT + '/maint/' + uid()).set(record)
+    .then(() => {
+      closeModal('modalMaint');
+      showToast(`✅ 巡檢完成${pendingCount ? '（待處理 ' + pendingCount + '）' : ''}`);
+      renderMaintOverview();
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+function exportMaintExcel(month) {
+  month = month || maintMonthStr();
+  const recs = Object.values(state.maintInspections).filter(r => r && r.month === month);
+  if (!recs.length) { showToast(month + ' 尚無工務巡檢紀錄'); return; }
+  const latest = {};
+  recs.forEach(r => { if (!latest[r.unit] || (r.time || 0) > (latest[r.unit].time || 0)) latest[r.unit] = r; });
+  const order = [...GUEST_ROOMS, ...MAINT_ZONE_KEYS].filter(u => latest[u]);
+  const wb = XLSX.utils.book_new();
+  const usedNames = {};
+  const safeName = (name) => {
+    let n = String(name).replace(/[\\\/\?\*\[\]:]/g, '-').slice(0, 28) || 'sheet';
+    const base = n; let k = 1;
+    while (usedNames[n]) n = base + '_' + (++k);
+    usedNames[n] = 1; return n;
+  };
+  const h1 = ['巡檢單位', '巡檢日期', '巡檢人', '總項目', '異常已維修', '異常待處理'];
+  const r1 = order.map(u => { const r = latest[u]; return [maintUnitLabel(u), r.date || formatDate(r.time), r.inspector || '', r.totalItems || 0, r.fixedCount || 0, r.pendingCount || 0]; });
+  const ws1 = XLSX.utils.aoa_to_sheet([[`工務巡檢總表　${month}`], h1, ...r1]);
+  ws1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
+  ws1['!cols'] = [18, 14, 12, 8, 12, 12].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws1, safeName('總表'));
+  order.forEach(u => {
+    const r = latest[u];
+    const rows = [
+      [`${maintUnitLabel(u)}　工務巡檢　${r.date || formatDate(r.time)}　巡檢人：${r.inspector || ''}`],
+      ['類別', '項目', '狀態', '備註']
+    ];
+    maintCategoriesFor(u).forEach(cat => cat.items.forEach(it => {
+      const cell = (r.items && r.items[it.id]) || {};
+      rows.push([cat.label, it.name, MAINT_STATUS[cell.status]?.label || '', cell.reason || '']);
+    }));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    ws['!cols'] = [12, 22, 14, 28].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, safeName(maintUnitLabel(u)));
+  });
+  XLSX.writeFile(wb, `工務巡檢_${month}.xlsx`);
+  showToast(`✅ 工務巡檢報表已下載（總表＋${order.length}個單位）`);
+}
+function maintAbnormalItems(month) {
+  const out = [];
+  Object.values(state.maintInspections).forEach(rec => {
+    if (!rec || rec.month !== month || !rec.items) return;
+    maintCategoriesFor(rec.unit).forEach(cat => cat.items.forEach(it => {
+      const cell = rec.items[it.id];
+      if (cell && (cell.status === 'fixed' || cell.status === 'pending')) {
+        out.push({ unit: rec.unitLabel || rec.unit, category: cat.label, item: it.name,
+          status: cell.status, reason: cell.reason || '', inspector: rec.inspector || '',
+          date: rec.date || formatDate(rec.time), time: rec.time || 0 });
+      }
+    }));
+  });
+  return out.sort((a, b) => (a.status === b.status ? 0 : (a.status === 'pending' ? -1 : 1)) || (b.time - a.time));
+}
+function renderMaintAbnormal() {
+  const el = document.getElementById('maintAbnormalList');
+  if (!el) return;
+  const month = document.getElementById('rptMaintMonth')?.value || maintMonthStr();
+  const items = maintAbnormalItems(month);
+  if (!items.length) { el.innerHTML = `<div style="font-size:13px;color:var(--text2);text-align:center;padding:10px;">${month} 無異常紀錄</div>`; return; }
+  const pend = items.filter(i => i.status === 'pending').length;
+  const fixed = items.filter(i => i.status === 'fixed').length;
+  el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">待處理 <b style="color:var(--danger)">${pend}</b> ｜ 已維修 <b style="color:var(--warning)">${fixed}</b></div>` +
+    items.map(i => `
+      <div class="card-sm" style="margin-bottom:6px;border-left:3px solid ${i.status === 'pending' ? 'var(--danger)' : 'var(--warning)'};">
+        <div style="font-size:13px;font-weight:600;">${i.unit} — ${i.item}</div>
+        <div style="font-size:11px;color:${i.status === 'pending' ? 'var(--danger)' : 'var(--warning)'};margin-top:2px;">${MAINT_STATUS[i.status].label}${i.reason ? '：' + escapeHtml(i.reason) : ''}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">${i.date} ｜ ${i.inspector}</div>
+      </div>`).join('');
+}
+function exportMaintAbnormal() {
+  const month = document.getElementById('rptMaintMonth')?.value || maintMonthStr();
+  const items = maintAbnormalItems(month);
+  if (!items.length) { showToast(month + ' 無異常紀錄'); return; }
+  const wb = XLSX.utils.book_new();
+  const h = ['巡檢單位', '類別', '項目', '狀態', '備註', '巡檢人', '巡檢日期'];
+  const rows = items.map(i => [i.unit, i.category, i.item, MAINT_STATUS[i.status].label, i.reason, i.inspector, i.date]);
+  const ws = XLSX.utils.aoa_to_sheet([[`工務巡檢異常紀錄　${month}`], h, ...rows]);
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  ws['!cols'] = [16, 12, 20, 12, 28, 12, 14].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, '工務異常');
+  XLSX.writeFile(wb, `工務異常紀錄_${month}.xlsx`);
+  showToast('✅ 工務異常紀錄已下載');
+}
+function renderMaintRecord(rec) {
+  const cats = maintCategoriesFor(rec.unit);
+  const pendItems = [], fixedItems = [];
+  cats.forEach(cat => cat.items.forEach(it => {
+    const cell = rec.items?.[it.id];
+    if (cell?.status === 'pending') pendItems.push(it.name + (cell.reason ? '（' + cell.reason + '）' : ''));
+    else if (cell?.status === 'fixed') fixedItems.push(it.name);
+  }));
+  const pend = rec.pendingCount || pendItems.length;
+  return `<div class="record-card" style="border-left:4px solid var(--warning);">
+    <div class="record-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:16px;">🛠️</span>
+          <div class="record-room">${escapeHtml(rec.unitLabel || rec.unit)}</div>
+        </div>
+        <div class="record-times">巡檢：${formatTime(rec.time)} ｜ ${escapeHtml(rec.inspector||'')}</div>
+      </div>
+      <span class="badge ${pend ? 'badge-rush' : 'badge-normal'}">${pend ? ('待處理 ' + pend) : '正常'}</span>
+    </div>
+    ${pendItems.length ? `<div style="font-size:12px;color:var(--danger);margin-top:6px;">🔴 待處理：${pendItems.map(escapeHtml).join('、')}</div>` : ''}
+    ${fixedItems.length ? `<div style="font-size:12px;color:var(--warning);margin-top:4px;">🟠 已維修：${fixedItems.map(escapeHtml).join('、')}</div>` : ''}
+    ${(!pendItems.length && !fixedItems.length) ? `<div style="font-size:12px;color:var(--success);margin-top:4px;">✓ 全數正常</div>` : ''}
+    ${state.isAdmin ? `<div style="margin-top:8px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-sm btn-danger" style="opacity:.7;" onclick="deleteMaintRecord('${rec._id}')">🗑 刪除</button>
+    </div>` : ''}
+  </div>`;
+}
+function deleteMaintRecord(recId) {
+  if (!state.isAdmin) { showToast('❌ 僅主管可刪除'); return; }
+  if (!confirm('確定刪除此工務巡檢紀錄？')) return;
+  db.ref(DB_ROOT + '/maint/' + recId).remove()
+    .then(() => { showToast('✅ 已刪除'); renderRecords(); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
 function renderInspectRooms() {
   const floor = document.getElementById('inspFloor') ? document.getElementById('inspFloor').value : 'all';
   const sel = document.getElementById('inspRoom');
@@ -2427,6 +2833,90 @@ function adminDeleteRecord(recId) {
   }).catch(e => showToast('❌ 錯誤: ' + e.message));
 }
 
+// ─── 紀錄可修改：補按完成 / 一鍵補登異常 ───
+function recHasPeople(rec) {
+  const p = new Set();
+  Object.values(rec.assignees||{}).forEach(a => { if(Array.isArray(a)) a.forEach(s=>{ if(s) p.add(s); }); });
+  return p.size > 0;
+}
+function isCleanAbnormal(rec) {
+  return !rec.endTime || !recHasPeople(rec);
+}
+function adminCompleteRecord(recId, recDate) {
+  if (!state.isAdmin) { showToast('❌ 僅管理員可標記完成'); return; }
+  const rec = state.recentCleanRecords[recId] || state.cleaningRecords[recId];
+  if (!rec) { showToast('❌ 找不到紀錄'); return; }
+  if (!confirm('確定將此筆標記為完成？\n（結束時間將設為現在）')) return;
+  const date = recDate || rec._date || getBusinessDate();
+  const endTime = Date.now();
+  db.ref(`${DB_ROOT}/cleaning/${date}/${recId}`).update({ endTime, status:'completed', manualDone:true })
+    .then(() => {
+      if (rec.room && rec.room !== '公共清潔') db.ref(`${DB_ROOT}/roomStatus/${rec.room}`).update({ status:'completed', endTime });
+      showToast('✅ 已標記完成');
+      loadRecentRecords(7);
+    })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+function toggleAllFix(on) {
+  document.querySelectorAll('.abnFix').forEach(c => { c.checked = on; });
+}
+function abnormalFixPanel() {
+  const staffEntries = Object.entries(state.staff);
+  const opt = () => `<option value="">—</option>` + staffEntries.map(([sid,s]) => `<option value="${sid}">${s.name}</option>`).join('');
+  const areaRow = ([akey, alabel]) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <div style="width:48px;font-size:13px;font-weight:600;color:var(--text2);flex-shrink:0;">${alabel.zh}</div>
+      <select id="fix_${akey}_0" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-size:13px;">${opt()}</select>
+      <select id="fix_${akey}_1" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-size:13px;">${opt()}</select>
+    </div>`;
+  return `
+  <div class="card" style="margin:10px;border:1px solid var(--warning);">
+    <div style="font-weight:700;margin-bottom:4px;">⚠️ 一鍵補登未完成/異常</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">先設定各區負責人員 → 勾選下方要補登的紀錄 → 按「套用並儲存」一次寫入。</div>
+    <div style="font-size:12px;font-weight:600;margin-bottom:6px;">👥 預設各區人員</div>
+    ${Object.entries(AREAS).map(areaRow).join('')}
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:10px 0 4px;cursor:pointer;">
+      <input type="checkbox" id="fixAlsoComplete" checked style="width:18px;height:18px;"> 同時標記「整理中」為完成
+    </label>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-sm btn-outline" style="flex:1;" onclick="toggleAllFix(true)">全選</button>
+      <button class="btn btn-sm btn-outline" style="flex:1;" onclick="toggleAllFix(false)">取消全選</button>
+      <button class="btn btn-sm btn-success" style="flex:2;" onclick="batchFixRecords()">💾 套用並儲存</button>
+    </div>
+  </div>`;
+}
+function batchFixRecords() {
+  if (!state.isAdmin) { showToast('❌ 僅主管可操作'); return; }
+  const template = {};
+  let hasTpl = false;
+  Object.keys(AREAS).forEach(akey => {
+    const ids = [0,1].map(i => document.getElementById(`fix_${akey}_${i}`)?.value).filter(Boolean);
+    const uniq = [...new Set(ids)];
+    if (uniq.length) { template[akey] = uniq; hasTpl = true; }
+  });
+  const checks = [...document.querySelectorAll('.abnFix:checked')];
+  if (!checks.length) { showToast('請先勾選要補登的紀錄'); return; }
+  if (!hasTpl) { showToast('請先設定至少一個區域的人員'); return; }
+  const alsoComplete = document.getElementById('fixAlsoComplete')?.checked;
+  const now = Date.now();
+  const tasks = checks.map(chk => {
+    const recId = chk.value;
+    const date  = chk.dataset.date;
+    const rec   = state.recentCleanRecords[recId] || {};
+    const newAssignees = { ...(rec.assignees||{}), ...template };
+    const updates = { assignees: newAssignees };
+    if (alsoComplete && !rec.endTime) { updates.endTime = now; updates.status = 'completed'; updates.manualDone = true; }
+    const p = db.ref(`${DB_ROOT}/cleaning/${date}/${recId}`).update(updates);
+    if (updates.endTime && rec.room && rec.room !== '公共清潔') {
+      db.ref(`${DB_ROOT}/roomStatus/${rec.room}`).update({ status:'completed', endTime: now });
+    }
+    return p;
+  });
+  Promise.all(tasks)
+    .then(() => { showToast(`✅ 已補登 ${tasks.length} 筆`); loadRecentRecords(7); })
+    .catch(e => showToast('❌ 錯誤: ' + e.message));
+}
+
 function adminDeleteIssue(issId) {
   if (!state.isAdmin) { showToast('❌ 僅管理員可刪除'); return; }
   if (!confirm('確定要刪除此問題紀錄？')) return;
@@ -2748,17 +3238,30 @@ function renderRecords() {
     return ts && getBusinessDate(ts) === selDate;
   }).map(r => ({...r, _type:'insp'}));
 
-  let combined = [...cleanEntries, ...inspEntries];
+  // 工務巡檢紀錄：依日期選擇器的業務日過濾
+  const maintEntries = Object.entries(state.maintInspections).filter(([id, r]) => {
+    const ts = r && r.time;
+    return ts && getBusinessDate(ts) === selDate;
+  }).map(([id, r]) => ({...r, _id:id, _type:'maint', startTime:r.time}));
+
+  let combined = [...cleanEntries, ...inspEntries, ...maintEntries];
 
   // 篩選
   combined = combined.filter(r => {
     if (state.recFilter === 'clean') return r._type === 'clean';
     if (state.recFilter === 'insp')  return r._type === 'insp';
+    if (state.recFilter === 'maint') return r._type === 'maint';
+    if (state.recFilter === 'abnormal') return r._type === 'clean' && isCleanAbnormal(r);
     return true;
   });
 
+  const abn = state.recFilter === 'abnormal';
+  const panelHtml = (abn && state.isAdmin) ? abnormalFixPanel() : '';
+
   if (!combined.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div>${selDate} 尚無紀錄</div></div>`;
+    const icon = abn ? '✅' : '📋';
+    const msg  = abn ? '沒有未完成 / 異常的紀錄' : `${selDate} 尚無紀錄`;
+    container.innerHTML = panelHtml + `<div class="empty-state"><div class="empty-icon">${icon}</div><div>${msg}</div></div>`;
     return;
   }
 
@@ -2772,7 +3275,7 @@ function renderRecords() {
   });
 
   const sortedDates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
-  container.innerHTML = sortedDates.map(date => {
+  container.innerHTML = panelHtml + sortedDates.map(date => {
     const recs = groups[date].sort((a,b) => ((b.startTime||b.time||0)-(a.startTime||a.time||0)));
     const today = localDateStr(new Date());
     const yesterday = localDateStr(new Date(Date.now()-86400000));
@@ -2781,6 +3284,7 @@ function renderRecords() {
       + recs.map(rec => {
         if (rec._type === 'clean') return renderCleanRecord(rec);
         if (rec._type === 'insp')  return renderInspRecord(rec);
+        if (rec._type === 'maint') return renderMaintRecord(rec);
         return '';
       }).join('');
   }).join('');
@@ -2788,15 +3292,30 @@ function renderRecords() {
 
 function renderCleanRecord(rec) {
   const recId = rec._id;
+  const isPublic = rec.room === '公共清潔' || rec.type === 'public';
   const typeInfo = CLEANING_TYPES[rec.type] || {};
   const isComplete = !!rec.endTime;
+  const abnMode = state.recFilter === 'abnormal';
+  const noPeople = !recHasPeople(rec);
+  const ongoing = !isComplete;
+  const recDate = rec._date || getBusinessDate();
   const areaHtml = Object.entries(areasFor(rec.room)).map(([akey, alabel]) => {
     const people = (rec.assignees && rec.assignees[akey]) || [];
     const names = people.map(sid => state.staff[sid]?.name||'').filter(Boolean);
     return names.length ? `<div class="area-tag">${alabel[state.lang]}: ${names.join('、')}</div>` : '';
   }).join('');
 
-  return `<div class="record-card">
+  const checkbox = (abnMode && state.isAdmin && !isPublic)
+    ? `<input type="checkbox" class="abnFix" value="${recId}" data-date="${recDate}" style="width:20px;height:20px;flex-shrink:0;margin-right:8px;align-self:center;">`
+    : '';
+  const reasonTags = abnMode ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+      ${ongoing  ? '<span class="badge badge-rush" style="font-size:11px;">⏳ 整理中(忘按完成)</span>' : ''}
+      ${noPeople ? '<span class="badge badge-rush" style="font-size:11px;">👤 未選人員</span>' : ''}
+    </div>` : '';
+
+  return `<div class="record-card" style="${abnMode?'display:flex;align-items:flex-start;':''}">
+    ${checkbox}
+    <div style="${abnMode?'flex:1;':''}">
     <div class="record-head">
       <div>
         <div style="display:flex;align-items:center;gap:6px;">
@@ -2805,16 +3324,19 @@ function renderCleanRecord(rec) {
         </div>
         <div class="record-times">
           ${t('startTime')}: ${formatTime(rec.startTime)}
-          ${isComplete ? ` ｜ ${t('endTime')}: ${formatTime(rec.endTime)} (${formatDuration(rec.startTime,rec.endTime)})` : ` ｜ <span style="color:var(--warning)">⏳ 整理中</span>`}
+          ${isComplete ? ` ｜ ${t('endTime')}: ${formatTime(rec.endTime)}${rec.manualDone ? ' <span style="color:var(--text3);">(補登)</span>' : ` (${formatDuration(rec.startTime,rec.endTime)})`}` : ` ｜ <span style="color:var(--warning)">⏳ 整理中</span>`}
         </div>
       </div>
       <span class="badge ${typeInfo.cls||''}">${ct(rec.type)}</span>
     </div>
+    ${reasonTags}
     <div class="record-areas">${areaHtml}</div>
     ${state.isAdmin ? `<div style="margin-top:8px;display:flex;justify-content:flex-end;gap:8px;">
+      ${ongoing ? `<button class="btn btn-sm btn-success" onclick="adminCompleteRecord('${recId}','${recDate}')">✅ 補按完成</button>` : ''}
       <button class="btn btn-sm btn-outline" onclick="openEditRecord('${recId}')">✏️ 修改</button>
       <button class="btn btn-sm btn-danger" style="opacity:.7;" onclick="adminDeleteRecord('${recId}')">🗑 刪除</button>
     </div>` : ''}
+    </div>
   </div>`;
 }
 
@@ -3053,6 +3575,18 @@ function renderReports() {
         <input type="month" id="rptMonthRef" value="${thisMonth}">
       </div>
       <button class="btn btn-primary btn-sm w-full" onclick="exportMonthlyReport()">📊 月報 Excel（3張）</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">🛠️ 工務巡檢紀錄</div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>選擇月份（可補匯出上月）</label>
+        <input type="month" id="rptMaintMonth" value="${thisMonth}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-primary btn-sm w-full" onclick="exportMaintExcel(document.getElementById('rptMaintMonth').value)">📊 匯出完整明細（總表＋每單位分頁）</button>
+        <button class="btn btn-outline btn-sm w-full" onclick="exportMaintAbnormal()">📤 匯出異常紀錄（已維修／待處理）</button>
+      </div>
     </div>
   `;
   setTimeout(updateWeekLabel, 50);
