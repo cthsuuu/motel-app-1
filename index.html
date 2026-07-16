@@ -3543,6 +3543,19 @@ function renderReports() {
     </div>
 
     <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;">👥 期間員工整房間數</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>起始日期</label>
+        <input type="date" id="rptStaffStart" value="${thisMonth}-01">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>結束日期</label>
+        <input type="date" id="rptStaffEnd" value="${today}">
+      </div>
+      <button class="btn btn-primary btn-sm w-full" onclick="exportPeriodStaffCount()">👥 匯出期間員工間數</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
       <div style="font-weight:600;margin-bottom:10px;">🔍 查房報表</div>
       <div class="form-group" style="margin-bottom:8px;">
         <label>查房期間起</label>
@@ -3970,6 +3983,46 @@ function exportMonthlyReport() {
     XLSX.writeFile(wb, `月報_${prefix}.xlsx`);
     showToast('✅ 月報已下載（3張工作表）');
   });
+}
+
+// 期間員工整房間數（跨月正確）
+async function exportPeriodStaffCount() {
+  const startStr = document.getElementById('rptStaffStart')?.value;
+  const endStr   = document.getElementById('rptStaffEnd')?.value;
+  if (!startStr || !endStr || startStr > endStr) { showToast('請選擇正確的起訖日期'); return; }
+  showToast('載入資料中...');
+  const months = new Set();
+  let cur = new Date(startStr + 'T12:00:00');
+  const end = new Date(endStr + 'T12:00:00');
+  while (cur <= end) { months.add(localDateStr(cur).slice(0,7)); cur.setDate(cur.getDate()+1); }
+  let allRecs = [];
+  for (const mo of [...months].sort()) {
+    const snap = await db.ref(DB_ROOT+'/cleaning').orderByKey().startAt(mo+'-01').endAt(mo+'-31\uf8ff').once('value');
+    const data = snap.val() || {};
+    Object.entries(data).forEach(([dk, day]) => {
+      if (dk >= startStr && dk <= endStr) Object.values(day).forEach(r => allRecs.push(r));
+    });
+  }
+  const done = allRecs.filter(r => r.endTime);
+  const stats = aggregateStats(done);
+  const period = `${startStr}～${endStr}`;
+  const headers = ['姓名','職位','整房','保養','車庫保養','補洗沐','公共清潔','指派事項','合計'];
+  const rows = Object.entries(stats).map(([sid,s]) => {
+    const st = state.staff[sid]; if(!st) return null;
+    const total = Math.round((s.clean+s.maintain+s.garage)*100)/100;
+    return [st.name, ROLE_LABELS[st.role]?.zh||'', s.clean, s.maintain, s.garage, s.refill||0, s.public||0, s.assign||0, total];
+  }).filter(Boolean).sort((a,b)=>b[8]-a[8]);
+  if (!rows.length) { showToast('此期間無完成紀錄'); return; }
+  const tot = rows.reduce((acc,r)=>{ [2,3,4,5,6,7,8].forEach(i=>acc[i]=(acc[i]||0)+r[i]); return acc; }, ['合計','',0,0,0,0,0,0,0]);
+  [2,3,4,5,6,7,8].forEach(i=>tot[i]=Math.round(tot[i]*100)/100);
+  rows.push(tot);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([[`員工整房間數　${period}`], headers, ...rows]);
+  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:8}}];
+  applyPrintStyle(ws, '', [10,8,6,6,8,8,8,8,8]);
+  XLSX.utils.book_append_sheet(wb, ws, '期間間數');
+  XLSX.writeFile(wb, `員工整房間數_${period}.xlsx`);
+  showToast('✅ 期間員工間數已下載');
 }
 
 // ════════════════════════════════
